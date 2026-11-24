@@ -1,7 +1,16 @@
-// Master Interactive Controller: Card Wars 3D World + Sir Pip Intro & Comic Dialogue + Manual Shorts (v6)
+// Master Interactive Controller (PRD Refinement v8)
+// Connects: 9 Large Illustrated Physical 3D Cards on Tabletop, Strict Ordered Curriculum
+// (Intro -> Arti Algoritma -> Cara Kerja & Implementasi -> Visualisasi), Butler Sir Pip,
+// Permanent Shapes Legend (L1), Mode Fokus (L2), Mode Presentasi (P), Speaker Notes (S),
+// 3 Duration Tracks, Interactive Glossary (F2), M0 Click-to-Drop-Ball, M3-M4 3.5s Walkthrough,
+// Lab Two-Tier Controls (L8), and 8-Question Final Quiz (M9).
 
-import { BENCHMARK_FUNCTIONS, PAPER_EMPIRICAL_DATA } from '../algorithms/benchmarks.js?v=6';
-import { generateWorkload, generateVmSpeeds, runPatternBSimulation } from '../algorithms/mct-goa.js?v=6';
+import {
+  BENCHMARK_FUNCTIONS,
+  PAPER_EMPIRICAL_DATA,
+  MCT_WALKTHROUGH_EXAMPLE
+} from '../algorithms/benchmarks.js?v=10';
+import { generateWorkload, generateVmSpeeds, runPatternBSimulation } from '../algorithms/mct-goa.js?v=10';
 import {
   MetaheuristicRunner,
   comfortZoneRadius,
@@ -9,11 +18,14 @@ import {
   computeHybridC,
   computeW,
   computeI
-} from '../algorithms/hybrid-goa-alo.js?v=6';
+} from '../algorithms/hybrid-goa-alo.js?v=10';
 import {
+  renderShapesLegend,
   renderButler2DSvg,
   renderCoverStoryStage,
   renderIntuitionTerrain,
+  intuitionTerrainY,
+  renderMctWalkthrough,
   renderGrasshopperSpecimen,
   renderAntlionPitCutaway,
   renderSocialForceField,
@@ -21,18 +33,24 @@ import {
   renderHybridTaxonomy,
   renderHybridFlowchart,
   FLOWCHART_NODES
-} from '../viz/svg-illustrator.js?v=6';
+} from '../viz/svg-illustrator.js?v=10';
 import {
   renderSocialCurveChart,
   renderCDecayChart,
+  renderWStaircaseChart,
   renderMctConvergenceChart,
   renderLabConvergenceChart,
   renderBenchmarkChart
-} from '../viz/svg-charts.js?v=6';
-import { ThreeLabController } from '../viz/three-lab.js?v=6';
-import { CardWarsWorld } from '../viz/world-3d.js?v=6';
-import { ShortsStageController, INTRO_BEATS } from './shorts-stage.js?v=6';
-import { DeckController, SLIDE_META, positionSlidingIndicator } from './deck.js?v=6';
+} from '../viz/svg-charts.js?v=10';
+import { ThreeLabController } from '../viz/three-lab.js?v=10';
+import { CardWarsWorld } from '../viz/world-3d.js?v=10';
+import {
+  ShortsStageController,
+  INTRO_BEATS,
+  GLOSSARY_TERMS,
+  FINAL_QUIZ_QUESTIONS
+} from './shorts-stage.js?v=10';
+import { DeckController, SLIDE_META, positionSlidingIndicator } from './deck.js?v=10';
 
 function bindRangePair(baseId, { min, max, onChange }) {
   const rangeEl = document.getElementById(`${baseId}-range`);
@@ -105,31 +123,84 @@ function formatNum(val) {
 
 const INTUITION_COPY = {
   random: {
-    heading: 'Tahap 1: Jika Hanya Menebak Acak',
-    body: 'Jika beberapa penjelajah dijatuhkan acak tanpa koordinasi, sebagian besar langsung puas dan terjebak di lubang dangkal (Optimum Lokal) tanpa sadar ada lembah yang jauh lebih dalam di sebelah kanan.'
+    heading: 'Tahap 1: Tebakan Acak Sering Terjebak Lokal',
+    body: 'Jika titik uji dijatuhkan acak tanpa koordinasi, bola sering berhenti di lubang dangkal pertama (Optimum Lokal) tanpa menyadari ada lembah jauh lebih dalam di kanan.'
   },
   explore: {
-    heading: 'Tahap 2: Eksplorasi (Menyebar Luas ala GOA)',
-    body: 'Penjelajah (lingkaran biru) saling memberi jarak dan melompat melintasi bukit. Fase Eksplorasi memetakan wilayah luas agar lembah terdalam (Optimum Global) berhasil terlihat.'
+    heading: 'Tahap 2: Eksplorasi (Menyebar Luas)',
+    body: 'Seperti mencari restoran di kota baru dengan berkeliling dulu, agen lingkaran biru menyebar melampaui bukit hingga area lembah terdalam (Optimum Global) terdeteksi.'
   },
   exploit: {
-    heading: 'Tahap 3: Eksploitasi (Mengerucut Presisi ala ALO)',
-    body: 'Begitu wilayah lembah terdalam ditemukan, area pencarian dipersempit seperti corong pasir (segitiga merah) sehingga semua titik meluncur halus menuju dasar terbaik.'
+    heading: 'Tahap 3: Eksploitasi (Mengerucut Presisi)',
+    body: 'Begitu lembah terdalam terlihat, corong merah mempersempit ruang pencarian agar seluruh titik fokus menukik halus ke dasar terbaik.'
   }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // --- FULL-VIEWPORT 3D CARD WARS WORLD + SIR PIP BUTLER ---
+  // --- L1: PERMANENT SHAPES LEGEND STRIP ---
+  renderShapesLegend(document.getElementById('permanent-shapes-legend'));
+
+  // --- F2: INTERACTIVE GLOSSARY TOOLTIPS & FULL LIST ---
+  const glossToast = document.getElementById('glossary-toast');
+  const glossTitle = document.getElementById('gloss-title');
+  const glossBody = document.getElementById('gloss-body');
+
+  function showGlossaryTerm(key) {
+    const entry = GLOSSARY_TERMS[key];
+    if (!entry || !glossToast) return;
+    if (glossTitle) glossTitle.textContent = `Glosarium: ${entry.term}`;
+    if (glossBody) glossBody.textContent = entry.def;
+    glossToast.classList.add('is-open');
+  }
+
+  function showAllGlossary() {
+    if (!glossToast) return;
+    if (glossTitle) glossTitle.textContent = 'Glosarium Istilah Utama';
+    if (glossBody) {
+      glossBody.innerHTML = `<div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">${
+        Object.values(GLOSSARY_TERMS).map((g) => `<div><strong style="color:#FDE047">${g.term}:</strong> ${g.def}</div>`).join('')
+      }</div>`;
+    }
+    glossToast.classList.add('is-open');
+  }
+
+  document.querySelectorAll('.gloss-term').forEach((btn) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); showGlossaryTerm(btn.dataset.term); });
+  });
+  document.getElementById('gloss-close-btn')?.addEventListener('click', () => glossToast?.classList.remove('is-open'));
+  document.getElementById('hud-glossary-btn')?.addEventListener('click', () => showAllGlossary());
+
+  // --- FULL-VIEWPORT 3D TABLETOP WITH 9 PHYSICAL CLICKABLE 3D CARDS ---
+  let deck = null;
+  let shorts = null;
   const hudRenderToggle = document.getElementById('hud-render-toggle');
+  const hoverHint = document.getElementById('table-hover-hint');
+
   const world = new CardWarsWorld({
     webglContainer: document.getElementById('world-webgl-mount'),
     fallbackContainer: document.getElementById('world-2d-fallback'),
+    cards: SLIDE_META,
     onModeChange(mode) {
-      if (hudRenderToggle) {
-        hudRenderToggle.textContent = mode === 'webgl' ? 'Meja: 3D' : 'Meja: 2D';
+      if (hudRenderToggle) hudRenderToggle.textContent = mode === 'webgl' ? 'Render: 3D' : 'Render: 2D';
+    },
+    onCardHover(idx) {
+      if (!hoverHint) return;
+      if (idx === null || idx < 0 || idx >= SLIDE_META.length) {
+        hoverHint.classList.remove('is-visible');
+      } else {
+        const m = SLIDE_META[idx];
+        hoverHint.textContent = `Kartu ${m.roman} (${m.suitLabel}): ${m.shortTitle} - Klik untuk mengangkat & membuka`;
+        hoverHint.classList.add('is-visible');
       }
+    },
+    onCardPick(idx) {
+      if (!deck) return;
+      if (deck.isIntro) deck.setIntro(false, { silent: true });
+      if (deck.peekMode) deck.togglePeek(false);
+      // Clicking a physical 3D card on the tabletop lifts & opens it directly!
+      deck.goTo(idx);
     }
   });
   world.init(false).then(() => syncWorldGpuState());
@@ -138,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
     world.set2DMode(world.mode === 'webgl');
   });
 
-  // --- LIVE LOOPING BEAT ANIMATION REGISTRY (Auto-cleaned on every beat/card/tab switch) ---
+  // --- LIVE LOOPING BEAT ANIMATION REGISTRY ---
   let beatLoopRaf = null;
   let beatLoopTimer = null;
 
@@ -149,14 +220,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function startRafLoop(renderFn, periodMs = 2800) {
     stopBeatLoop();
-    if (prefersReducedMotion) {
-      renderFn(0.75);
-      return;
-    }
+    if (prefersReducedMotion) { renderFn(0.75); return; }
     const start = performance.now();
     const tick = (now) => {
       const cyc = ((now - start) % periodMs) / periodMs;
-      // Smooth ping-pong [0.12 .. 0.96] so shapes breathe & glide gently without jarring reset
       const smooth = 0.5 - 0.5 * Math.cos(cyc * Math.PI * 2);
       renderFn(0.12 + smooth * 0.84);
       beatLoopRaf = requestAnimationFrame(tick);
@@ -174,24 +241,36 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.setAttribute('aria-pressed', String(active));
     });
     const el = document.getElementById('cover-story-svg');
-    if (loop) {
-      startRafLoop((phaseT) => renderCoverStoryStage(el, { focus, phaseT }), 3200);
-    } else {
-      renderCoverStoryStage(el, { focus, phaseT: 0.72 });
-    }
+    if (loop) startRafLoop((phaseT) => renderCoverStoryStage(el, { focus, phaseT }), 3200);
+    else renderCoverStoryStage(el, { focus, phaseT: 0.72 });
   }
-
   document.querySelectorAll('.cover-chapter-btn').forEach((btn) => {
     btn.addEventListener('click', () => setCoverFocus(btn.dataset.focus, true));
   });
   document.getElementById('cover-replay-btn')?.addEventListener('click', () => setCoverFocus(coverFocus, true));
 
-  // --- CARD II: BEGINNER INTUITION ---
+  // --- CARD II: M0 CLICK-TO-DROP-BALL + M2 INTUITION ---
   let intuitionStage = 'random';
+  let intuitionUserBallX = null;
   let intuitionSeqTimer = null;
 
   function stopIntuitionSeq() {
     if (intuitionSeqTimer) { clearTimeout(intuitionSeqTimer); intuitionSeqTimer = null; }
+  }
+
+  function handleDropBall(svgX) {
+    intuitionUserBallX = svgX;
+    const fitVal = ((245 - intuitionTerrainY(svgX)) / 10).toFixed(2);
+    const zone = Math.abs(svgX - 378) < 42
+      ? 'Dekat Optimum Global!'
+      : Math.abs(svgX - 150) < 42
+        ? 'Terjebak di Optimum Lokal!'
+        : 'Di lereng bukit.';
+    const readout = document.getElementById('intuition-ball-readout');
+    if (readout) readout.textContent = `Bola uji f(x) = ${fitVal} (${zone}) [Ilustrasi]`;
+    renderIntuitionTerrain(document.getElementById('intuition-terrain-svg'), {
+      stage: intuitionStage, phaseT: 0.85, userBallX: intuitionUserBallX, onDropBall: handleDropBall
+    });
   }
 
   function setIntuitionStage(stage, loop = true) {
@@ -208,9 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const targetEl = document.getElementById('intuition-terrain-svg');
     if (loop) {
-      startRafLoop((phaseT) => renderIntuitionTerrain(targetEl, { stage, phaseT }), 2800);
+      startRafLoop((phaseT) => renderIntuitionTerrain(targetEl, { stage, phaseT, userBallX: intuitionUserBallX, onDropBall: handleDropBall }), 2800);
     } else {
-      renderIntuitionTerrain(targetEl, { stage, phaseT: 1 });
+      renderIntuitionTerrain(targetEl, { stage, phaseT: 1, userBallX: intuitionUserBallX, onDropBall: handleDropBall });
     }
   }
 
@@ -224,16 +303,37 @@ document.addEventListener('DOMContentLoaded', () => {
       intuitionSeqTimer = setTimeout(() => setIntuitionStage('exploit', true), 2000);
     }, 2000);
   });
-  renderIntuitionTerrain(document.getElementById('intuition-terrain-svg'), { stage: 'random', phaseT: 0.8 });
+  renderIntuitionTerrain(document.getElementById('intuition-terrain-svg'), { stage: 'random', phaseT: 0.8, onDropBall: handleDropBall });
 
   // --- CARD III: TAXONOMY ---
   const taxSvg = document.getElementById('tax-svg');
   renderHybridTaxonomy(taxSvg, { activePhase: 'all' });
   const syncTaxTabs = bindSegmentedTabs('tax-tabs', (phase) => renderHybridTaxonomy(taxSvg, { activePhase: phase }));
 
-  // --- CARD IV: POLA B (MCT-SEEDED GOA) ---
+  // --- CARD IV: M3-M4 VERIFIED 3.5s WALKTHROUGH + POLA B SIMULATOR ---
+  let mctWalkStep = 4;
+  function updateMctWalkthrough(step) {
+    mctWalkStep = Math.max(0, Math.min(4, step));
+    renderMctWalkthrough(document.getElementById('mct-walkthrough-svg'), { stepCount: mctWalkStep });
+    const cap = document.getElementById('mct-walk-caption');
+    if (cap) {
+      if (mctWalkStep === 0) {
+        cap.innerHTML = 'Klik <strong>Langkah MCT +1</strong> untuk memasukkan T1..T4 satu per satu (bandingkan dengan jadwal buruk semua di VM1 = <strong>10,0 detik</strong>).';
+      } else {
+        const info = MCT_WALKTHROUGH_EXAMPLE.steps[mctWalkStep - 1];
+        cap.innerHTML = `<strong>Langkah ${mctWalkStep}/4 (${info.task}):</strong> ${info.reason}`;
+      }
+    }
+  }
+  document.getElementById('mct-walk-step-btn')?.addEventListener('click', () => {
+    updateMctWalkthrough(mctWalkStep >= 4 ? 1 : mctWalkStep + 1);
+  });
+  document.getElementById('mct-walk-reset-btn')?.addEventListener('click', () => updateMctWalkthrough(0));
+  updateMctWalkthrough(4);
+
   const mctWeightsInput = document.getElementById('mct-weights');
   const mctPresetSelect = document.getElementById('mct-preset');
+  const mctAlgoSelect = document.getElementById('mct-algo-select');
   const mctComparePure = document.getElementById('mct-compare-pure');
   let latestMctContext = null;
   let mctShownSteps = null;
@@ -241,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function stopMctStepAnim() {
     stopBeatLoop();
     const playBtn = document.getElementById('mct-anim-play');
-    if (playBtn) playBtn.textContent = 'Putar Animasi MCT';
+    if (playBtn) playBtn.textContent = 'Putar Animasi';
   }
 
   const mctM = bindRangePair('mct-M', { min: 4, max: 16, onChange: () => { syncWorkloadInput(); runCardIV(); } });
@@ -255,26 +355,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function syncWorkloadInput() {
     mctWeightsInput.value = generateWorkload(mctM.get(), mctPresetSelect.value, 42).join(', ');
   }
-
   function parseWeights() {
     const raw = mctWeightsInput.value.split(',').map((s) => Number(s.trim())).filter((v) => Number.isFinite(v) && v > 0);
     return raw.length >= 2 ? raw.slice(0, 16) : generateWorkload(mctM.get(), mctPresetSelect.value, 42);
   }
-
   function redrawMctPipeline() {
     if (!latestMctContext) return;
     renderMctSeedingPipeline(document.getElementById('mct-pipeline-svg'), { ...latestMctContext, visibleSteps: mctShownSteps });
   }
-
   function startMctLoopAnim(loopForever = true) {
     if (!latestMctContext) return;
     stopBeatLoop();
     const total = latestMctContext.tasks.length;
-    if (prefersReducedMotion) {
-      mctShownSteps = total;
-      redrawMctPipeline();
-      return;
-    }
+    if (prefersReducedMotion) { mctShownSteps = total; redrawMctPipeline(); return; }
     mctShownSteps = 0;
     redrawMctPipeline();
     const playBtn = document.getElementById('mct-anim-play');
@@ -286,11 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         redrawMctPipeline();
       } else if (loopForever) {
         pauseTicks += 1;
-        if (pauseTicks >= 4) {
-          pauseTicks = 0;
-          mctShownSteps = 0;
-          redrawMctPipeline();
-        }
+        if (pauseTicks >= 4) { pauseTicks = 0; mctShownSteps = 0; redrawMctPipeline(); }
       } else {
         stopMctStepAnim();
       }
@@ -307,29 +396,28 @@ document.addEventListener('DOMContentLoaded', () => {
       cMax: mctCmax.get(), cMin: mctCmin.get(),
       seedRatio: mctSeedRatio.get() / 100, seed: 42
     });
-
-    latestMctContext = { tasks, vmSpeeds, mctResult: result.mctResult, mctGoa: result.mctGoa };
+    const activeAlgo = mctAlgoSelect?.value || 'pso';
+    const shownResult = activeAlgo === 'pso' ? result.mctPso : result.mctGoa;
+    const pureBaseline = activeAlgo === 'pso' ? result.purePso : result.pureGoa;
+    latestMctContext = { tasks, vmSpeeds, mctResult: result.mctResult, mctGoa: shownResult };
     mctShownSteps = tasks.length;
     redrawMctPipeline();
-
     renderMctConvergenceChart(document.getElementById('mct-conv-svg'), {
       mctHistory: result.mctGoa.history,
-      pureHistory: result.pureGoa.history,
+      psoHistory: result.mctPso.history,
+      pureHistory: pureBaseline.history,
       showPure: mctComparePure.checked
     });
-
     document.getElementById('mct-metric-init').textContent = `${result.mctResult.makespan.toFixed(2)} s`;
+    document.getElementById('mct-metric-pso').textContent = `${result.mctPso.bestMakespan.toFixed(2)} s`;
     document.getElementById('mct-metric-best').textContent = `${result.mctGoa.bestMakespan.toFixed(2)} s`;
-    document.getElementById('mct-metric-pure').textContent = `${result.pureGoa.bestMakespan.toFixed(2)} s`;
-    const diff = result.pureGoa.bestMakespan - result.mctGoa.bestMakespan;
-    document.getElementById('mct-metric-gain').textContent = diff >= 0 ? `-${diff.toFixed(2)} s lebih cepat` : `+${Math.abs(diff).toFixed(2)} s`;
+    document.getElementById('mct-metric-pure').textContent = `${pureBaseline.bestMakespan.toFixed(2)} s`;
   }
 
   document.getElementById('mct-anim-play')?.addEventListener('click', () => {
     if (beatLoopTimer) stopMctStepAnim();
     else startMctLoopAnim(false);
   });
-
   document.getElementById('mct-anim-step')?.addEventListener('click', () => {
     if (!latestMctContext) return;
     stopMctStepAnim();
@@ -337,13 +425,14 @@ document.addEventListener('DOMContentLoaded', () => {
     mctShownSteps = mctShownSteps >= total ? 1 : mctShownSteps + 1;
     redrawMctPipeline();
   });
-
+  mctAlgoSelect?.addEventListener('change', () => runCardIV());
   mctPresetSelect?.addEventListener('change', () => { syncWorkloadInput(); runCardIV(); });
   mctWeightsInput?.addEventListener('change', () => runCardIV());
   mctComparePure?.addEventListener('change', () => runCardIV());
   document.getElementById('mct-run-btn')?.addEventListener('click', () => runCardIV());
   document.getElementById('mct-reset-btn')?.addEventListener('click', () => {
-    mctM.set(10); mctK.set(3); mctSeedRatio.set(30); mctN.set(24); mctL.set(80); mctCmax.set(1.0); mctCmin.set(0.00001);
+    mctM.set(10); mctK.set(3); mctSeedRatio.set(20); mctN.set(24); mctL.set(80); mctCmax.set(1.0); mctCmin.set(0.00001);
+    if (mctAlgoSelect) mctAlgoSelect.value = 'pso';
     mctPresetSelect.value = 'skewed';
     mctComparePure.checked = true;
     syncWorkloadInput();
@@ -352,16 +441,14 @@ document.addEventListener('DOMContentLoaded', () => {
   syncWorkloadInput();
   runCardIV();
 
-  // --- CARD V: SINGLE ANATOMY (GOA & ALO) ---
+  // --- CARD V: GOA & ALO SINGLE ANATOMY ---
   const anatGoaPanel = document.getElementById('anat-panel-goa');
   const anatAloPanel = document.getElementById('anat-panel-alo');
-
   function setAnatTabVisual(tab) {
     const isGoa = tab === 'goa';
     anatGoaPanel?.classList.toggle('hidden', !isGoa);
     anatAloPanel?.classList.toggle('hidden', isGoa);
   }
-
   const syncAnatTabs = bindSegmentedTabs('anat-tabs', (tab) => {
     stopBeatLoop();
     setAnatTabVisual(tab);
@@ -380,13 +467,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderGrasshopperSpecimen(document.getElementById('anat-grasshopper-svg'), { prefix: 'a5g', legAngle, showAnnotations: false });
     renderSocialForceField(document.getElementById('anat-social-field-svg'), { f, l, animPhase });
     renderSocialCurveChart(document.getElementById('anat-social-curve-svg'), { f, l });
-    document.getElementById('anat-r0-readout').textContent = r0 ? `r0 = ${r0.toFixed(3)}` : 'Tidak ada akar (l = 1 / f >= 1)';
+    document.getElementById('anat-r0-readout').textContent = r0 ? `r0 = ${r0.toFixed(3)}` : 'Tidak ada akar';
   }
   updateCardVA(0);
-
-  document.getElementById('anat-goa-play')?.addEventListener('click', () => {
-    startRafLoop((p) => updateCardVA(p), 2200);
-  });
+  document.getElementById('anat-goa-play')?.addEventListener('click', () => startRafLoop((p) => updateCardVA(p), 2200));
 
   const anatProg = bindRangePair('anat-progress', { min: 0, max: 100, onChange: () => { stopBeatLoop(); updateCardVB(); } });
   function updateCardVB() {
@@ -405,9 +489,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function startAloLoop(loopForever = true) {
     stopBeatLoop();
-    if (prefersReducedMotion) { anatProg.set(55); updateCardVB(); return; }
+    if (prefersReducedMotion) { anatProg.set(60); updateCardVB(); return; }
     const btn = document.getElementById('anat-alo-play');
-    if (btn) btn.textContent = 'Jeda Gerak Corong';
+    if (btn) btn.textContent = 'Jeda Corong';
     beatLoopTimer = setInterval(() => {
       const cur = anatProg.get();
       const next = cur >= 96 ? (loopForever ? 8 : 96) : cur + 2;
@@ -415,21 +499,16 @@ document.addEventListener('DOMContentLoaded', () => {
       updateCardVB();
       if (!loopForever && next >= 96) {
         stopBeatLoop();
-        if (btn) btn.textContent = 'Putar Mangsa Tergelincir';
+        if (btn) btn.textContent = 'Putar Corong';
       }
     }, 75);
   }
-
   document.getElementById('anat-alo-play')?.addEventListener('click', () => {
-    if (beatLoopTimer) {
-      stopBeatLoop();
-      document.getElementById('anat-alo-play').textContent = 'Putar Mangsa Tergelincir';
-    } else {
-      startAloLoop(false);
-    }
+    if (beatLoopTimer) { stopBeatLoop(); document.getElementById('anat-alo-play').textContent = 'Putar Corong'; }
+    else startAloLoop(false);
   });
 
-  // --- CARD VI: HYBRID FLOWCHART & MODIFIED c CURVE ---
+  // --- CARD VI: HYBRID FLOWCHART, MODIFIED c, & W STAIRCASE ---
   function updateFlowchart(nodeId) {
     renderHybridFlowchart(document.getElementById('flow-svg'), { selectedId: nodeId, onSelect: updateFlowchart });
     const info = FLOWCHART_NODES.find((n) => n.id === nodeId) || FLOWCHART_NODES[0];
@@ -440,6 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('flow-detail-why').textContent = info.why;
   }
   updateFlowchart('modc');
+  renderWStaircaseChart(document.getElementById('w-staircase-svg'));
 
   const cL = bindRangePair('c-L', { min: 50, max: 1000, onChange: () => updateCardVICurve() });
   const cMax = bindRangePair('c-max', { min: 0.5, max: 2.0, onChange: () => updateCardVICurve() });
@@ -456,8 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   updateCardVICurve();
 
-  // --- CARD VII: THREE.JS 3D LAB ---
-  let labMode = 'hybrid';
+  // --- CARD VII: LAB 3D & 2D (Default Preset: F13 Rastrigin Compare All Three!) ---
+  let labMode = 'compare';
   let labPlaying = false;
   let labTimer = null;
   let prefer2D = false;
@@ -493,7 +573,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function getLayers() {
     return { trail: !!layerTrail?.checked, vectors: !!layerVectors?.checked, traps: !!layerTraps?.checked };
   }
-
   function buildLabConfig(mode) {
     return {
       mode, funcId: labFuncSelect?.value || 'F13',
@@ -503,7 +582,6 @@ document.addEventListener('DOMContentLoaded', () => {
       seed: Number(labSeedInput?.value) || 42
     };
   }
-
   function updateLabReadouts() {
     const primary = labRunners[0];
     if (!primary) return;
@@ -512,21 +590,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tel-phase').textContent = tel.phase;
     document.getElementById('tel-c').textContent = formatNum(tel.c);
     document.getElementById('tel-wi').textContent = `w=${tel.w} | I=${tel.I >= 1000 ? tel.I.toExponential(1) : tel.I.toFixed(1)}`;
-    document.getElementById('tel-elite-pos').textContent = `(${tel.elitePos[0].toFixed(3)}, ${(tel.elitePos[1] ?? 0).toFixed(3)})`;
+    document.getElementById('tel-elite-pos').textContent = `(${tel.elitePos[0].toFixed(2)}, ${(tel.elitePos[1] ?? 0).toFixed(2)})`;
     document.getElementById('tel-elite-fit').textContent = formatNum(tel.eliteFit);
     document.getElementById('tel-mean-fit').textContent = formatNum(tel.meanFit);
 
     const seriesMeta = {
-      hybrid: { label: 'Hybrid GOA-ALO', color: '#B91C1C', width: 2.6 },
-      goa: { label: 'GOA Murni', color: '#1D4ED8', width: 2.0, dash: '5 3' },
-      alo: { label: 'ALO Murni', color: '#0F766E', width: 1.9, dash: '2 2' }
+      hybrid: { label: 'Hybrid', color: '#B91C1C', width: 2.8 },
+      goa: { label: 'GOA', color: '#1D4ED8', width: 2.2, dash: '5 3' },
+      alo: { label: 'ALO', color: '#0F766E', width: 2.2, dash: '2 2' }
     };
     renderLabConvergenceChart(document.getElementById('lab-conv-svg'), {
       series: labRunners.map((r) => ({ ...seriesMeta[r.mode], values: r.convergence })),
       maxIter: tel.maxIter
     });
   }
-
   function resetLab() {
     stopLab();
     const fn = BENCHMARK_FUNCTIONS[labFuncSelect?.value || 'F13'] || BENCHMARK_FUNCTIONS.F13;
@@ -536,26 +613,22 @@ document.addEventListener('DOMContentLoaded', () => {
     labController.updateAgents(labRunners, getLayers());
     updateLabReadouts();
     if (labBanner && labBannerText) {
-      labBannerText.textContent = 'Simulasi siap dijalankan. Tekan Jalankan (Space) atau ubah parameter.';
+      labBannerText.textContent = 'Skenario Rastrigin: Bandingkan Ketiganya siap. Tekan Jalankan (Space).';
       labBanner.classList.remove('is-hidden');
     }
   }
-
   function stepLab(steps = 1) {
     if (!labRunners.length) return;
     if (labBanner) labBanner.classList.add('is-hidden');
-    for (let s = 0; s < steps; s++) {
-      labRunners.forEach((r) => { if (r.iter < r.maxIter) r.step(); });
-    }
+    for (let s = 0; s < steps; s++) labRunners.forEach((r) => { if (r.iter < r.maxIter) r.step(); });
     labController.updateAgents(labRunners, getLayers());
     updateLabReadouts();
     if (labRunners.every((r) => r.iter >= r.maxIter)) stopLab();
   }
-
   function startLab() {
     if (labRunners.every((r) => r.iter >= r.maxIter)) resetLab();
     labPlaying = true;
-    if (labPlayBtn) labPlayBtn.textContent = 'Jeda (Space)';
+    if (labPlayBtn) labPlayBtn.textContent = 'Jeda Simulasi (Space)';
     const loopTick = () => {
       if (!labPlaying) return;
       const spd = labSpeed.get();
@@ -564,24 +637,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     loopTick();
   }
-
   function stopLab() {
     labPlaying = false;
     if (labTimer) { clearTimeout(labTimer); labTimer = null; }
-    if (labPlayBtn) labPlayBtn.textContent = 'Jalankan (Space)';
+    if (labPlayBtn) labPlayBtn.textContent = '2. Jalankan Simulasi (Space)';
   }
-
   function toggleLabPlay() {
-    if (labPlaying) stopLab();
-    else startLab();
+    if (labPlaying) stopLab(); else startLab();
   }
 
   const syncLabModeTabs = bindSegmentedTabs('lab-mode-tabs', (val) => { labMode = val; resetLab(); });
   labFuncSelect?.addEventListener('change', () => resetLab());
   labSeedInput?.addEventListener('change', () => resetLab());
-  [layerTrail, layerVectors, layerTraps].forEach((cb) => {
-    cb?.addEventListener('change', () => labController.updateAgents(labRunners, getLayers()));
-  });
+  [layerTrail, layerVectors, layerTraps].forEach((cb) => cb?.addEventListener('change', () => labController.updateAgents(labRunners, getLayers())));
   labPlayBtn?.addEventListener('click', () => toggleLabPlay());
   document.getElementById('lab-step-btn')?.addEventListener('click', () => { stopLab(); stepLab(1); });
   document.getElementById('lab-reset-btn')?.addEventListener('click', () => resetLab());
@@ -607,9 +675,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const group = PAPER_EMPIRICAL_DATA[groupKey] || PAPER_EMPIRICAL_DATA.unimodal;
     document.getElementById('bench-title').textContent = group.title;
     document.getElementById('bench-subtitle').textContent = group.subtitle;
+    const suffix = group.unit || (groupKey === 'antenna' ? ' dB' : '');
     const showRow = (row) => {
       document.getElementById('bench-tooltip-algo').textContent = row.algo;
-      document.getElementById('bench-tooltip-val').textContent = `${row.value}${groupKey === 'antenna' ? ' dB' : ''}`;
+      document.getElementById('bench-tooltip-val').textContent = `${row.value}${suffix}`;
       document.getElementById('bench-tooltip-note').textContent = row.note;
     };
     renderBenchmarkChart(document.getElementById('bench-chart-svg'), { groupKey, onFocusRow: showRow });
@@ -628,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const syncBenchTabs = bindSegmentedTabs('bench-tabs', (key) => renderCardVIII(key));
   renderCardVIII('unimodal');
 
-  // --- CARD IX: DECISION MATRIX ---
+  // --- CARD IX: DECISION MATRIX + M9 INTERACTIVE 8-QUESTION FINAL QUIZ ---
   const decisionState = { domain: 'discrete', budget: 'tight', prior: 'heuristic' };
   function updateDecisionMatrix() {
     let scoreB = 0;
@@ -643,15 +712,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const sumEl = document.getElementById('dec-summary');
     if (sumEl) {
       if (scoreB > scoreC) {
-        sumEl.textContent = 'Pilihan paling tepat: Pola B (MCT-seeded GOA). Untuk penjadwalan diskrit dengan heuristik cepat, MCT langsung memberi start rapi dengan overhead ringan.';
+        sumEl.textContent = '[Pertimbangan Didaktik] Rekomendasi Pola B (MCT-PSO seeding parsial 10-30% [Paper/Usulan] atau MCT-GOA): terbaik jika heuristik awal cepat tersedia dan anggaran CPU ketat.';
       } else if (scoreC > scoreB) {
-        sumEl.textContent = 'Pilihan paling tepat: Pola C (Hybrid GOA-ALO). Untuk peta pencarian kontinu multimodal, kerja tim GOA + ALO dan pivot c di L/2 memberi peluang tertinggi menyentuh optimum global.';
+        sumEl.textContent = '[Pertimbangan Didaktik] Rekomendasi Pola C (Hybrid GOA-ALO [Paper]): terbaik untuk lanskap kontinu multimodal dengan anggaran CPU memadai (213 s vs 67 s pada LAA).';
       } else {
-        sumEl.textContent = 'Profil seimbang: pilih Pola B bila kecepatan CPU lebih utama, atau Pola C bila akurasi global lebih diprioritaskan dibanding biaya CPU (213 s vs 67 s pada uji antena LAA).';
+        sumEl.textContent = '[Pertimbangan Didaktik] Profil seimbang: pilih MCT-PSO (Pola B) untuk kecepatan CPU, atau Hybrid GOA-ALO (Pola C) untuk akurasi global kontinu multimodal.';
       }
     }
   }
-
   document.querySelectorAll('.decision-opt').forEach((btn) => {
     btn.addEventListener('click', () => {
       const group = btn.dataset.group;
@@ -666,15 +734,60 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   updateDecisionMatrix();
 
-  // --- SCENE 0: INTRO CONTROLLER (BEFORE FLIPPING CARD I) ---
+  // Render 8-Question Final Quiz with instant explanatory feedback
+  const quizAnswers = new Map();
+  const quizList = document.getElementById('final-quiz-list');
+  const quizScoreBadge = document.getElementById('quiz-score-badge');
+
+  function renderFinalQuiz() {
+    if (!quizList) return;
+    quizList.innerHTML = FINAL_QUIZ_QUESTIONS.map((item, qIdx) => {
+      const picked = quizAnswers.get(qIdx);
+      const answered = typeof picked === 'number';
+      const isRight = picked === item.ans;
+      return `
+        <div class="quiz-item">
+          <div class="font-bold" style="font-size:13.5px">${item.q}</div>
+          <div>
+            ${item.opts.map((opt, oIdx) => {
+              const cls = answered
+                ? (oIdx === item.ans ? 'is-correct' : oIdx === picked ? 'is-wrong' : '')
+                : '';
+              return `<button type="button" class="quiz-opt ${cls}" data-q="${qIdx}" data-o="${oIdx}">${opt}</button>`;
+            }).join('')}
+          </div>
+          ${answered ? `<div class="quiz-feedback"><strong>${isRight ? 'Benar!' : 'Kurang tepat.'}</strong> ${item.why}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    let correctCount = 0;
+    FINAL_QUIZ_QUESTIONS.forEach((item, idx) => {
+      if (quizAnswers.get(idx) === item.ans) correctCount += 1;
+    });
+    if (quizScoreBadge) {
+      const pct = Math.round((correctCount / FINAL_QUIZ_QUESTIONS.length) * 100);
+      quizScoreBadge.textContent = `Skor: ${correctCount}/${FINAL_QUIZ_QUESTIONS.length} (${pct}%)`;
+      quizScoreBadge.className = `src-badge ${pct >= 80 ? 'src-prop' : 'src-sim'}`;
+    }
+
+    quizList.querySelectorAll('.quiz-opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        quizAnswers.set(Number(btn.dataset.q), Number(btn.dataset.o));
+        renderFinalQuiz();
+      });
+    });
+  }
+  renderFinalQuiz();
+
+  // --- SCENE 0: INTRO CONTROLLER OVER 3D 9-CARD TABLETOP ---
   let introStep = 0;
   const introBadge = document.getElementById('intro-butler-badge');
   const introMoodPill = document.getElementById('intro-mood-pill');
   const introTitle = document.getElementById('intro-title');
   const introBody = document.getElementById('intro-body');
   const introNextBtn = document.getElementById('intro-next-btn');
-  const introSkipBtn = document.getElementById('intro-skip-btn');
-  const introDots = Array.from(document.querySelectorAll('#intro-step-dots .intro-dot'));
+  const tableFlipAllBtn = document.getElementById('table-flip-all-btn');
 
   function renderIntroStep(stepIdx = 0) {
     introStep = Math.max(0, Math.min(INTRO_BEATS.length - 1, stepIdx));
@@ -684,41 +797,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (introTitle) introTitle.textContent = item.title;
     if (introBody) introBody.innerHTML = item.bodyHtml;
     if (introNextBtn) introNextBtn.textContent = item.cta;
-    introDots.forEach((d, i) => d.classList.toggle('is-active', i <= introStep));
-    world.setCameraMode('intro');
+    world.setCameraMode('table');
+    world.setTableInteractive(true);
     world.setButlerMood(item.mood);
-    world.setCardFaceState({ suit: 'concept', roman: 'I', faceDown: true });
   }
 
   function advanceIntro() {
     if (introStep < INTRO_BEATS.length - 1) {
       renderIntroStep(introStep + 1);
     } else {
-      // Transition cleanly from Intro -> Card I face-down on table ready for the user to flip!
       deck.setIntro(false, { silent: true });
-      deck.selectCard(0, { forceFaceDownFirst: true, animateDeal: true });
+      deck.goTo(0);
     }
   }
-
   introNextBtn?.addEventListener('click', () => advanceIntro());
-  introSkipBtn?.addEventListener('click', () => {
-    deck.setIntro(false, { silent: true });
-    deck.selectCard(0, { forceFaceDownFirst: true, animateDeal: true });
+  tableFlipAllBtn?.addEventListener('click', () => {
+    const nextFaceUp = !world.showAllFaceUp;
+    world.setShowAllFaceUp(nextFaceUp);
+    tableFlipAllBtn.textContent = nextFaceUp ? 'Tutup 9 Kartu' : 'Buka 9 Kartu';
   });
 
-  // --- GPU HANDOFF ORCHESTRATOR (Only ONE WebGL loop runs at a time!) ---
-  let deck = null;
-  let shorts = null;
-
+  // --- GPU HANDOFF ORCHESTRATOR (L2: Pause 3D World during Mode Fokus / Presentation / Card VII Lab!) ---
   function syncWorldGpuState() {
     if (!deck || !shorts) return;
-    const onCardVIIOpen = !deck.isIntro && deck.current === 6 && !deck.isFaceDown && !deck.peekMode;
-    const labNeedsWebGL = onCardVIIOpen && labController.mode === 'webgl';
+    const labBeatMode = shorts.getCurrentBeat()?.effectiveMode;
+    const onCardVIIOpen = !deck.isIntro && deck.current === 6 && !deck.isFaceDown && !deck.peekMode && labBeatMode !== 'explain';
+    const on3DTable = deck.isIntro || deck.peekMode;
+
+    world.setTableInteractive(on3DTable);
+    world.syncDeckState({ openedSet: deck.openedCards, activeIdx: deck.current });
 
     labController.setActive(!document.hidden && onCardVIIOpen);
     if (!onCardVIIOpen && labPlaying) stopLab();
 
-    if (document.hidden || labNeedsWebGL) {
+    // L2: 3D table animates vividly during Intro & Peek Table; pauses to save GPU in Presentation or Card VII WebGL Lab
+    if (document.hidden || deck.presMode || (onCardVIIOpen && labController.mode === 'webgl')) {
       world.pause();
     } else {
       world.resume();
@@ -743,15 +856,10 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHybridTaxonomy(taxSvg, { activePhase: phase });
         requestAnimationFrame(() => syncTaxTabs(phase, true));
       } else if (domain === 'mct') {
-        if (sub === 'step0') {
-          mctShownSteps = 2;
-          redrawMctPipeline();
-        } else if (sub === 'animate') {
-          startMctLoopAnim(true);
-        } else {
-          mctShownSteps = latestMctContext ? latestMctContext.tasks.length : 10;
-          redrawMctPipeline();
-        }
+        if (sub === 'walk0') updateMctWalkthrough(0);
+        else if (sub === 'walk4') updateMctWalkthrough(4);
+        else if (sub === 'animate') { updateMctWalkthrough(4); startMctLoopAnim(true); }
+        else { updateMctWalkthrough(4); mctShownSteps = latestMctContext ? latestMctContext.tasks.length : 10; redrawMctPipeline(); }
       } else if (domain === 'single') {
         const tab = sub === 'alo' ? 'alo' : 'goa';
         setAnatTabVisual(tab);
@@ -762,14 +870,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateFlowchart(sub || 'modc');
         updateCardVICurve();
       } else if (domain === 'lab') {
-        if (sub === 'compare') {
-          labMode = 'compare';
-          resetLab();
-        }
-        requestAnimationFrame(() => {
-          syncLabModeTabs(labMode, true);
-          labController.resize();
-        });
+        if (sub === 'compare') { labMode = 'compare'; resetLab(); }
+        requestAnimationFrame(() => { syncLabModeTabs(labMode, true); labController.resize(); });
       } else if (domain === 'bench') {
         const group = sub || 'unimodal';
         renderCardVIII(group);
@@ -780,12 +882,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       syncWorldGpuState();
     },
-    onNextCard(nextIdx) {
-      deck?.selectCard(nextIdx);
-    },
-    onRevealCard() {
-      deck?.revealCurrent();
-    }
+    onNextCard(nextIdx) { deck?.selectCard(nextIdx); },
+    onRevealCard() { deck?.revealCurrent(); }
   });
 
   // --- DECK CONTROLLER ---
@@ -798,17 +896,16 @@ document.addEventListener('DOMContentLoaded', () => {
         syncWorldGpuState();
       }
     },
+    onTrackChange(trackKey) {
+      shorts.setDurationTrack(trackKey);
+    },
     onSlideChange(idx, meta, isFaceDown, isDeal) {
       stopBeatLoop();
       stopIntuitionSeq();
 
-      if (isDeal) {
-        world.triggerCardDeal({ suit: meta.suit, roman: meta.roman, faceDown: isFaceDown });
-      } else {
-        world.setCardFaceState({ suit: meta.suit, roman: meta.roman, faceDown: isFaceDown });
-      }
+      if (isDeal) world.triggerCardDeal({ activeIdx: idx, openedSet: deck.openedCards });
+      else world.syncDeckState({ activeIdx: idx, openedSet: deck.openedCards });
 
-      // Keep Sir Pip cleanly framed in upper-left above his Comic Speech Bubble on both closed & opened cards
       world.setCameraMode('focus');
 
       if (isFaceDown) {
@@ -820,16 +917,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     },
     onSpaceKey() {
-      if (deck.isIntro) {
-        advanceIntro();
-        return;
-      }
+      if (deck.isIntro) { advanceIntro(); return; }
       const beat = shorts.getCurrentBeat();
-      if (deck.current === 6 && beat.effectiveMode === 'interactive') {
-        toggleLabPlay();
-      } else {
-        shorts.nextBeat();
-      }
+      if (deck.current === 6 && beat.effectiveMode === 'interactive') toggleLabPlay();
+      else shorts.nextBeat();
     },
     onBeatNav(dir) {
       if (dir > 0) shorts.nextBeat();
@@ -838,15 +929,14 @@ document.addEventListener('DOMContentLoaded', () => {
     onPeekChange(peeking) {
       if (peeking) {
         stopBeatLoop();
-        world.setCameraMode('peek');
+        world.setCameraMode('table');
         world.setButlerMood('greet');
       } else if (deck.isIntro) {
         renderIntroStep(introStep);
       } else {
         world.setCameraMode('focus');
-        if (deck.isFaceDown) {
-          world.setButlerMood('deal');
-        } else {
+        if (deck.isFaceDown) world.setButlerMood('deal');
+        else {
           const curBeat = shorts.getCurrentBeat();
           world.setButlerMood(curBeat.mood);
           shorts.goToBeat(curBeat.beatIdx);
@@ -856,18 +946,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.getElementById('btn-start-deck')?.addEventListener('click', () => deck.selectCard(1));
+  document.getElementById('btn-start-deck')?.addEventListener('click', () => deck.goTo(3));
   document.getElementById('btn-jump-lab')?.addEventListener('click', () => {
     deck.goTo(6);
-    shorts.goToBeat(2);
+    shorts.goToBeat(1);
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      stopBeatLoop();
-      stopIntuitionSeq();
-      if (labPlaying) stopLab();
-    }
+    if (document.hidden) { stopBeatLoop(); stopIntuitionSeq(); if (labPlaying) stopLab(); }
     syncWorldGpuState();
   });
 
@@ -876,12 +962,6 @@ document.addEventListener('DOMContentLoaded', () => {
     labController.resize();
   });
 
-  // Sync initial startup view (Intro or direct #hash card)
-  if (deck.isIntro) {
-    renderIntroStep(0);
-  } else {
-    const initMeta = SLIDE_META[deck.current] || SLIDE_META[0];
-    world.setCardFaceState({ suit: initMeta.suit, roman: initMeta.roman, faceDown: deck.isFaceDown });
-  }
+  if (deck.isIntro) renderIntroStep(0);
   syncWorldGpuState();
 });

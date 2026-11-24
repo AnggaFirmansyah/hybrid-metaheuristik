@@ -1,5 +1,5 @@
-// Pola B: MCT-seeded GOA (Heuristic -> Metaheuristic sequential seeding)
-// Canonical Minimum Completion Time (MCT) + Grasshopper Optimization Algorithm (Saremi et al., 2017)
+// Pola B: MCT-seeded PSO [Paper: Alsaidy et al., 2020] & MCT-seeded GOA [Usulan]
+// Canonical Minimum Completion Time (MCT) + PSO (Kennedy & Eberhart, 1995) + GOA (Saremi et al., 2017)
 
 import { createRng } from './benchmarks.js';
 
@@ -194,6 +194,99 @@ function solveWithGOA({
   };
 }
 
+// Canonical Continuous Particle Swarm Optimization (PSO: Kennedy & Eberhart, 1995)
+// Supports MCT heuristic seeding (Alsaidy et al., 2020) with partial population diversity preservation.
+function solveWithPSO({
+  tasks,
+  vmSpeeds,
+  popSize = 24,
+  maxIter = 80,
+  seedRatio = 0.2,
+  mctAssignment = null,
+  seed = 42
+}) {
+  const rng = createRng(seed + 101);
+  const M = tasks.length;
+  const K = vmSpeeds.length;
+  const lb = 0;
+  const ub = K - 0.0001;
+  const vMax = Math.max(0.6, K * 0.45);
+  const pSeed = mctAssignment && seedRatio > 0 ? Math.max(1, Math.round(popSize * seedRatio)) : 0;
+
+  const pos = [];
+  const vel = [];
+  const pBest = [];
+  const pBestFit = [];
+
+  for (let i = 0; i < popSize; i++) {
+    const x = new Array(M);
+    const v = new Array(M);
+    for (let d = 0; d < M; d++) {
+      if (i === 0 && pSeed > 0) {
+        x[d] = mctAssignment[d] + 0.5;
+      } else if (i < pSeed) {
+        x[d] = Math.min(ub, Math.max(lb, mctAssignment[d] + 0.5 + (rng() - 0.5) * 0.9));
+      } else {
+        x[d] = rng() * ub;
+      }
+      v[d] = (rng() - 0.5) * 0.5;
+    }
+    const fit = evaluateContinuousPosition(x, tasks, vmSpeeds).makespan;
+    pos.push(x);
+    vel.push(v);
+    pBest.push([...x]);
+    pBestFit.push(fit);
+  }
+
+  let gIdx = 0;
+  for (let i = 1; i < popSize; i++) {
+    if (pBestFit[i] < pBestFit[gIdx]) gIdx = i;
+  }
+  let gBest = [...pBest[gIdx]];
+  let gBestFit = pBestFit[gIdx];
+  const history = [gBestFit];
+
+  const c1 = 1.65;
+  const c2 = 1.65;
+  for (let l = 1; l <= maxIter; l++) {
+    const w = 0.85 - (l / maxIter) * 0.45; // Linearly decreasing inertia 0.85 -> 0.40
+    for (let i = 0; i < popSize; i++) {
+      for (let d = 0; d < M; d++) {
+        const r1 = rng();
+        const r2 = rng();
+        let vd = w * vel[i][d] + c1 * r1 * (pBest[i][d] - pos[i][d]) + c2 * r2 * (gBest[d] - pos[i][d]);
+        if (vd > vMax) vd = vMax;
+        if (vd < -vMax) vd = -vMax;
+        let xd = pos[i][d] + vd;
+        if (xd < lb) { xd = lb + rng() * 0.15; vd *= -0.4; }
+        if (xd > ub) { xd = ub - rng() * 0.15; vd *= -0.4; }
+        vel[i][d] = vd;
+        pos[i][d] = xd;
+      }
+      const fit = evaluateContinuousPosition(pos[i], tasks, vmSpeeds).makespan;
+      if (fit < pBestFit[i]) {
+        pBestFit[i] = fit;
+        pBest[i] = [...pos[i]];
+        if (fit < gBestFit) {
+          gBestFit = fit;
+          gBest = [...pos[i]];
+        }
+      }
+    }
+    history.push(gBestFit);
+  }
+
+  const bestEval = evaluateContinuousPosition(gBest, tasks, vmSpeeds);
+  return {
+    bestMakespan: gBestFit,
+    bestSchedule: bestEval.schedule,
+    bestAssignment: bestEval.assignment,
+    readyTimes: bestEval.readyTimes,
+    history,
+    pSeed
+  };
+}
+
 export function runPatternBSimulation(config) {
   const {
     tasks,
@@ -207,6 +300,26 @@ export function runPatternBSimulation(config) {
   } = config;
 
   const mctResult = runMCT(tasks, vmSpeeds);
+
+  const mctPso = solveWithPSO({
+    tasks,
+    vmSpeeds,
+    popSize,
+    maxIter,
+    seedRatio,
+    mctAssignment: mctResult.assignment,
+    seed
+  });
+
+  const purePso = solveWithPSO({
+    tasks,
+    vmSpeeds,
+    popSize,
+    maxIter,
+    seedRatio: 0,
+    mctAssignment: null,
+    seed
+  });
 
   const mctGoa = solveWithGOA({
     tasks,
@@ -232,5 +345,5 @@ export function runPatternBSimulation(config) {
     seed
   });
 
-  return { mctResult, mctGoa, pureGoa };
+  return { mctResult, mctPso, purePso, mctGoa, pureGoa };
 }

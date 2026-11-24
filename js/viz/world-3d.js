@@ -1,9 +1,12 @@
-// Full-Viewport 3D Adventure Time: Card Wars Tabletop World & 3D Toon Butler ("Sir Pip")
-// Single Three.js WebGL scene with inverted-hull toon outlines, dynamic canvas facial expressions,
-// flying 3D card deal animation, smooth 3-preset camera lerp, GPU pause/resume handoff for Card VII,
-// and automatic 2D Cartoon SVG fallback when WebGL is unavailable or lost.
+// Full-Viewport 3D Coastal Tabletop Simulator Card Wars World (v9)
+// Features: Exact Reference Sir Pip Mascot (mint console, white tux shirt, red bowtie + gold knot,
+// wide-brim tilted top hat, waving round mint hand & 3 fanned orange/gold cards),
+// ALL 9 LARGE ILLUSTRATED 512x704 3D CARDS, plus rich coastal island background & tabletop props
+// (sunny flower-wood table, blue ocean & animated foam, sky dome & drifting clouds, sailboat,
+// coastal palms, distant Candy/Ooo spires, rainbow, bunting flags, stacked card piles, HP tokens,
+// D6/D20/D8 dice, drawstring pouches, watchtower, crystal spire, GOA grasshopper & ALO hourglass!).
 
-import { BUTLER_MOODS, renderButler2DSvg } from './svg-illustrator.js?v=6';
+import { BUTLER_MOODS, renderButler2DSvg } from './svg-illustrator.js?v=10';
 
 let cachedThree = null;
 
@@ -26,101 +29,86 @@ function hasWebGL() {
   }
 }
 
-const SUIT_COLOR_MAP = {
-  mct: '#0F766E',
-  goa: '#1D4ED8',
-  alo: '#B91C1C',
-  concept: '#D97706'
-};
+// 9 Large Physical 3D Cards laid cleanly in 2 tactile rows on the 3D Card Wars playmat
+// Row 1 (Far, 4 cards: I-IV: Intro & Arti) | Row 2 (Near, 5 cards: V-IX: Implementasi, Visualisasi & Kuis)
+const TABLE_CARD_SLOTS = [
+  { x: -2.28, z: -0.92, rotY: -0.04 },
+  { x: -0.76, z: -0.98, rotY: 0.02 },
+  { x: 0.76, z: -0.98, rotY: -0.02 },
+  { x: 2.28, z: -0.92, rotY: 0.04 },
+  { x: -2.68, z: 1.02, rotY: -0.05 },
+  { x: -1.34, z: 1.06, rotY: 0.02 },
+  { x: 0.0, z: 1.08, rotY: 0.0 },
+  { x: 1.34, z: 1.06, rotY: -0.02 },
+  { x: 2.68, z: 1.02, rotY: 0.05 }
+];
+
+const CARD_THEME_STYLES = [
+  { frame: '#2B6CB0', sky: '#DBEAFE', tag: '01 INTRO', art: 'valley' },
+  { frame: '#6D28D9', sky: '#EDE9FE', tag: '02 POLA B/C', art: 'taxonomy' },
+  { frame: '#0F766E', sky: '#CCFBF1', tag: '03 ARTI 3 ALGO', art: 'triad' },
+  { frame: '#0F766E', sky: '#D1FAE5', tag: '04 POLA B', art: 'gantt' },
+  { frame: '#B91C1C', sky: '#FEE2E2', tag: '05 POLA C', art: 'pivot' },
+  { frame: '#1D4ED8', sky: '#DBEAFE', tag: '06 ANATOMI', art: 'forces' },
+  { frame: '#047857', sky: '#D1FAE5', tag: '07 LAB 3D', art: 'mountain' },
+  { frame: '#B45309', sky: '#FEF3C7', tag: '08 BUKTI', art: 'bars' },
+  { frame: '#8C2D19', sky: '#FFEDD5', tag: '09 KUIS', art: 'shield' }
+];
 
 // ============================================================================
-// AUTOMATIC 2D CARTOON SVG CARD WARS TABLETOP + BUTLER FALLBACK
+// AUTOMATIC 2D INTERACTIVE 9-CARD TABLETOP FALLBACK (ZERO WEBGL REQUIRED)
 // ============================================================================
-export function render2DFallbackWorld(container, { mood = 'greet', suit = 'concept', roman = 'I', faceDown = false } = {}) {
+export function render2DFallbackWorld(
+  container,
+  { mood = 'greet', cards = [], openedSet = new Set(), activeIdx = 0, showAllFaceUp = false, onCardPick = null } = {}
+) {
   if (!container) return;
-  const accent = SUIT_COLOR_MAP[suit] || '#D97706';
   const safeMood = BUTLER_MOODS.includes(mood) ? mood : 'greet';
+  const fallbackMeta = cards.length ? cards : Array.from({ length: 9 }, (_, i) => ({
+    roman: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][i],
+    shortTitle: `Kartu ${i + 1}`,
+    suit: 'concept',
+    suitSym: '◆'
+  }));
+
+  const cardButtons = fallbackMeta.map((m, idx) => {
+    const isOpen = showAllFaceUp || openedSet.has(idx);
+    const isAct = idx === activeIdx;
+    return `
+      <button type="button" class="table-2d-card ${isOpen ? 'is-opened' : 'is-closed'} ${isAct ? 'is-active' : ''}" data-table-card="${idx}">
+        <span class="font-mono-num font-bold">${m.roman} ${m.suitSym}</span>
+        <span class="font-display font-bold leading-tight">${m.shortTitle}</span>
+        <span class="font-mono-num">${isOpen ? 'TERBUKA' : 'KLIK BUKA'}</span>
+      </button>
+    `;
+  }).join('');
 
   container.innerHTML = `
     <div class="world-2d-stage" data-mood="${safeMood}">
-      <svg viewBox="0 0 1440 820" preserveAspectRatio="xMidYMid slice" class="w-full h-full block" role="img" aria-label="Panggung meja Card Wars 2D fallback dengan Butler Sir Pip">
-        <defs>
-          <linearGradient id="cw2d-sky" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#48B2F2"/>
-            <stop offset="100%" stop-color="#9BE3FF"/>
-          </linearGradient>
-          <linearGradient id="cw2d-sea" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#1E88C7"/>
-            <stop offset="100%" stop-color="#2CA4D8"/>
-          </linearGradient>
-        </defs>
-
-        <!-- Sunny Cartoon Sky + Soft Clouds -->
-        <rect x="0" y="0" width="1440" height="390" fill="url(#cw2d-sky)"/>
-        <g fill="#FFFFFF" opacity="0.82">
-          <ellipse cx="220" cy="110" rx="74" ry="26"/>
-          <ellipse cx="268" cy="100" rx="52" ry="24"/>
-          <ellipse cx="1160" cy="128" rx="88" ry="28"/>
-          <ellipse cx="1220" cy="116" rx="56" ry="22"/>
-        </g>
-
-        <!-- Distant Islands & Sea -->
-        <path d="M 960 322 Q 1030 238 1110 322 Z" fill="#5D7D7E" stroke="#1A1816" stroke-width="3"/>
-        <path d="M 1180 322 Q 1235 262 1295 322 Z" fill="#6F948D" stroke="#1A1816" stroke-width="3"/>
-        <rect x="0" y="320" width="1440" height="86" fill="url(#cw2d-sea)" stroke="#1A1816" stroke-width="3"/>
-        <line x1="0" y1="406" x2="1440" y2="406" stroke="#E0F7FF" stroke-width="7"/>
-
-        <!-- Warm Sandy Beach -->
-        <rect x="0" y="406" width="1440" height="414" fill="#F6DF98"/>
-        <g fill="#1F9D68" stroke="#1A1816" stroke-width="2.5" stroke-linejoin="round">
-          <path d="M 290 424 L 280 390 L 298 412 L 306 382 L 315 412 L 330 392 L 322 424 Z"/>
-          <path d="M 1120 434 L 1112 402 L 1128 422 L 1138 394 L 1146 422 L 1160 404 L 1152 434 Z"/>
-        </g>
-
-        <!-- Stacked Tire Pedestal -->
-        <ellipse cx="720" cy="744" rx="190" ry="38" fill="rgba(26,24,22,0.18)"/>
-        <rect x="572" y="618" width="296" height="122" rx="22" fill="#2E3B37" stroke="#1A1816" stroke-width="5"/>
-        <line x1="572" y1="678" x2="868" y2="678" stroke="#1A1816" stroke-width="5"/>
-
-        <!-- Yellow Card Wars Wooden Tabletop -->
-        <polygon points="210,434 1230,434 1345,634 95,634" fill="#F2C94C" stroke="#1A1816" stroke-width="5" stroke-linejoin="round"/>
-        <rect x="95" y="634" width="1250" height="24" rx="4" fill="#C78A1F" stroke="#1A1816" stroke-width="5"/>
-
-        <!-- Dual-Lane Card Wars Board -->
-        <polygon points="480,468 720,468 720,598 430,598" fill="#2B6CB0" stroke="#1A1816" stroke-width="4"/>
-        <polygon points="720,468 960,468 1010,598 720,598" fill="#B7791F" stroke="#1A1816" stroke-width="4"/>
-
-        <!-- Lemonade Pitcher & Deck Box Props on Far Edge -->
-        <g stroke="#1A1816" stroke-width="3.2" stroke-linejoin="round">
-          <rect x="615" y="346" width="66" height="86" rx="12" fill="#FEF08A"/>
-          <path d="M 681 364 C 704 364 704 408 681 408" fill="none" stroke="#1A1816" stroke-width="5"/>
-          <circle cx="672" cy="348" r="14" fill="#FACC15"/>
-          <rect x="815" y="376" width="76" height="56" rx="6" fill="#C49A6C"/>
-          <rect x="920" y="388" width="38" height="44" rx="6" fill="#FFFFFF"/>
-        </g>
-
-        <!-- Active 2D Card Resting on Center Playmat (Unified Card Wars Deck Color) -->
-        <g transform="translate(720 532) rotate(-3)">
-          <rect x="-46" y="-56" width="92" height="112" rx="10" fill="${faceDown ? '#8C2D19' : '#FFFDF7'}" stroke="#1A1816" stroke-width="4"/>
-          <rect x="-36" y="-46" width="72" height="92" rx="6" fill="none" stroke="${faceDown ? '#FDE047' : '#8C2D19'}" stroke-width="3"/>
-          <text x="0" y="10" text-anchor="middle" font-family="Fredoka, Syne, sans-serif" font-size="30" font-weight="700" fill="${faceDown ? '#FDE047' : '#1A1816'}">${roman}</text>
-        </g>
-      </svg>
-
-      <!-- 2D Sir Pip Butler Seated at Upper-Left of Table -->
-      <div class="world-2d-butler" id="world-2d-butler-mount"></div>
+      <div class="world-2d-playmat">
+        <div class="world-2d-header">
+          <div id="world-2d-butler-mount"></div>
+          <div class="world-2d-mat-title">MEJA 9 KARTU SOKA (MODE 2D) - KLIK KARTU MANA SAJA</div>
+        </div>
+        <div class="world-2d-grid">${cardButtons}</div>
+      </div>
     </div>
   `;
 
-  const mount = container.querySelector('#world-2d-butler-mount');
-  renderButler2DSvg(mount, { mood: safeMood, compact: false });
+  renderButler2DSvg(container.querySelector('#world-2d-butler-mount'), { mood: safeMood, compact: true });
+
+  if (onCardPick) {
+    container.querySelectorAll('[data-table-card]').forEach((btn) => {
+      btn.addEventListener('click', () => onCardPick(Number(btn.dataset.tableCard)));
+    });
+  }
 }
 
 // ============================================================================
-// THREE.JS HELPERS: 3-BAND TOON GRADIENT, OUTLINES & CANVAS TEXTURES
+// THREE.JS HELPERS: TOON SHADING, OUTLINES, PLAYMAT & HIGH-RES 512x704 CARDS
 // ============================================================================
 function createToonGradientMap(THREE) {
-  const data = new Uint8Array([155, 222, 255]);
+  const data = new Uint8Array([155, 224, 255]);
   const tex = new THREE.DataTexture(data, 3, 1, THREE.RedFormat);
   tex.minFilter = THREE.NearestFilter;
   tex.magFilter = THREE.NearestFilter;
@@ -129,7 +117,7 @@ function createToonGradientMap(THREE) {
   return tex;
 }
 
-function addToonOutline(THREE, mesh, thickness = 1.06) {
+function addToonOutline(THREE, mesh, thickness = 1.05) {
   const mat = new THREE.MeshBasicMaterial({ color: 0x1A1816, side: THREE.BackSide });
   const outline = new THREE.Mesh(mesh.geometry, mat);
   outline.scale.setScalar(thickness);
@@ -137,98 +125,113 @@ function addToonOutline(THREE, mesh, thickness = 1.06) {
   return outline;
 }
 
-function createSkyTexture(THREE) {
+function createPlaymatTexture(THREE) {
   const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 512;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 0, 512);
-  grad.addColorStop(0, '#3EA8EF');
-  grad.addColorStop(0.58, '#7FD7FC');
-  grad.addColorStop(1, '#BCEEFF');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 512);
-
-  // Soft stylized Adventure Time clouds
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  const drawCloud = (cx, cy, s) => {
-    ctx.beginPath();
-    ctx.arc(cx, cy, 24 * s, 0, Math.PI * 2);
-    ctx.arc(cx + 26 * s, cy - 6 * s, 28 * s, 0, Math.PI * 2);
-    ctx.arc(cx + 54 * s, cy, 22 * s, 0, Math.PI * 2);
-    ctx.fill();
-  };
-  drawCloud(78, 96, 1.0);
-  drawCloud(360, 128, 1.15);
-  drawCloud(215, 62, 0.72);
-
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function createTabletopTexture(THREE) {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 256;
+  c.width = 1024;
+  c.height = 700;
   const ctx = c.getContext('2d');
 
-  ctx.fillStyle = '#F4CA4C';
-  ctx.fillRect(0, 0, 512, 256);
+  // Top Half: Adventure Time Card Wars Violet-Sunset Landscape Lane
+  const topGrad = ctx.createLinearGradient(0, 0, 0, 345);
+  topGrad.addColorStop(0, '#4C3B96');
+  topGrad.addColorStop(0.55, '#866EC7');
+  topGrad.addColorStop(1, '#F5B895');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, 1024, 348);
 
-  // Subtle wood plank seams
-  ctx.strokeStyle = 'rgba(176, 122, 20, 0.35)';
-  ctx.lineWidth = 3;
-  for (let y = 32; y < 256; y += 44) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(512, y);
-    ctx.stroke();
-  }
+  // Rolling cartoon violet hills & clouds
+  ctx.fillStyle = 'rgba(255, 245, 230, 0.35)';
+  ctx.beginPath(); ctx.arc(160, 80, 56, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(215, 72, 42, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(840, 86, 60, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(65, 45, 130, 0.36)';
+  ctx.beginPath();
+  ctx.moveTo(0, 348);
+  ctx.quadraticCurveTo(260, 220, 520, 300);
+  ctx.quadraticCurveTo(790, 210, 1024, 310);
+  ctx.lineTo(1024, 348);
+  ctx.closePath();
+  ctx.fill();
 
-  // Stylized warm flower decals inspired by Adventure Time: Card Wars beach table
-  const drawFlower = (cx, cy, r) => {
-    ctx.fillStyle = 'rgba(222, 162, 34, 0.48)';
-    for (let i = 0; i < 5; i++) {
-      const a = (i * Math.PI * 2) / 5;
-      ctx.beginPath();
-      ctx.ellipse(cx + Math.cos(a) * r * 0.7, cy + Math.sin(a) * r * 0.7, r * 0.45, r * 0.32, a, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = '#F8DE7E';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.34, 0, Math.PI * 2);
-    ctx.fill();
-  };
-  drawFlower(78, 134, 34);
-  drawFlower(432, 146, 36);
-  drawFlower(122, 54, 20);
-  drawFlower(396, 62, 22);
+  // Bottom Half: Bright Nicelands / Candy Kingdom Yellow-Sky Road Lane
+  const botGrad = ctx.createLinearGradient(0, 352, 0, 700);
+  botGrad.addColorStop(0, '#BAE6FD');
+  botGrad.addColorStop(0.38, '#FEF9C3');
+  botGrad.addColorStop(1, '#FDE68A');
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, 352, 1024, 348);
 
-  // Bold outer table border
+  // Cute pastel hills & winding golden-red road (inspired by reference screenshot!)
+  ctx.fillStyle = '#FBCFE8';
+  ctx.beginPath(); ctx.arc(180, 580, 150, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#BBF7D0';
+  ctx.beginPath(); ctx.arc(840, 595, 165, Math.PI, 0); ctx.fill();
+
+  ctx.strokeStyle = '#DC2626';
+  ctx.lineWidth = 34;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(30, 650);
+  ctx.bezierCurveTo(290, 575, 470, 675, 720, 605);
+  ctx.bezierCurveTo(860, 565, 940, 645, 995, 610);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#FDE047';
+  ctx.lineWidth = 22;
+  ctx.stroke();
+
+  // Lane divider ribbon
+  ctx.fillStyle = '#1A1816';
+  ctx.fillRect(0, 342, 1024, 16);
+  ctx.fillStyle = '#FDE047';
+  ctx.fillRect(0, 346, 1024, 8);
+
+  // Subtle dashed slot frames for all 9 cards
+  ctx.strokeStyle = 'rgba(26, 24, 22, 0.34)';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([12, 8]);
+  [182, 404, 620, 842].forEach((sx) => ctx.strokeRect(sx - 68, 178 - 94, 136, 188));
+  [128, 320, 512, 704, 896].forEach((sx) => ctx.strokeRect(sx - 68, 520 - 94, 136, 188));
+  ctx.setLineDash([]);
+
+  // Zone labels on mat edges
+  ctx.fillStyle = '#FFFDF7';
+  ctx.font = '700 18px Consolas, monospace';
+  ctx.fillText('BARIS 1: INTRO & ARTI ALGORITMA (KARTU I - IV)', 24, 30);
+  ctx.fillStyle = '#1A1816';
+  ctx.fillText('BARIS 2: IMPLEMENTASI, VISUALISASI & KUIS (KARTU V - IX)', 24, 380);
+
+  // Outer comic border
   ctx.strokeStyle = '#1A1816';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(5, 5, 502, 246);
+  ctx.lineWidth = 14;
+  ctx.strokeRect(7, 7, 1010, 686);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
-function createBoardLaneTexture(THREE, bgHex, lineHex) {
+function drawDeckBoxTexture(THREE, hueBg) {
   const c = document.createElement('canvas');
   c.width = 256;
   c.height = 256;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = bgHex;
+  ctx.fillStyle = hueBg;
   ctx.fillRect(0, 0, 256, 256);
 
-  ctx.strokeStyle = lineHex;
-  ctx.lineWidth = 4;
-  for (let i = 64; i < 256; i += 64) {
-    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
-  }
+  const colors = ['#0F766E', '#1D4ED8', '#B91C1C', '#FDE047', '#6D28D9', '#EA580C'];
+  colors.forEach((col, i) => {
+    const a1 = (i / colors.length) * Math.PI * 2;
+    const a2 = ((i + 1) / colors.length) * Math.PI * 2;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(128, 128);
+    ctx.arc(128, 128, 58, a1, a2);
+    ctx.closePath();
+    ctx.fill();
+  });
+  ctx.fillStyle = '#FFFDF7';
+  ctx.beginPath(); ctx.arc(128, 128, 22, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#1A1816';
   ctx.lineWidth = 10;
   ctx.strokeRect(5, 5, 246, 246);
@@ -238,187 +241,463 @@ function createBoardLaneTexture(THREE, bgHex, lineHex) {
   return tex;
 }
 
+// High-Resolution 512x704 Card Wars Illustrated Card Faces (Unique art per card!)
+function createCardFaceTexture(THREE, meta, idx, isBack = false) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 704;
+  const ctx = c.getContext('2d');
+  const style = CARD_THEME_STYLES[idx] || CARD_THEME_STYLES[0];
+  const unifiedBack = '#8C2D19';
+  const gold = '#FDE047';
+
+  if (isBack) {
+    // 1 Unified Card Wars Terracotta-Crimson Deck Back with Gold Crest & Clear Number
+    ctx.fillStyle = unifiedBack;
+    ctx.fillRect(0, 0, 512, 704);
+    ctx.strokeStyle = '#1A1816';
+    ctx.lineWidth = 24;
+    ctx.strokeRect(12, 12, 488, 680);
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 10;
+    ctx.strokeRect(36, 36, 440, 632);
+
+    ctx.fillStyle = '#6F2010';
+    ctx.beginPath();
+    ctx.moveTo(256, 130);
+    ctx.lineTo(396, 324);
+    ctx.lineTo(256, 518);
+    ctx.lineTo(116, 324);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = gold;
+    ctx.lineWidth = 9;
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFDF7';
+    ctx.font = '700 112px Trebuchet MS, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(meta.roman, 256, 310);
+
+    ctx.fillStyle = gold;
+    ctx.font = '700 34px Trebuchet MS, sans-serif';
+    ctx.fillText(meta.shortTitle, 256, 412);
+
+    ctx.fillStyle = '#FFFDF7';
+    ctx.font = '700 28px Consolas, monospace';
+    ctx.fillText('KLIK UNTUK BALIK', 256, 610);
+  } else {
+    // Authentic Card Wars Playing Card Front Layout (matching user's Tabletop Simulator reference!)
+    ctx.fillStyle = '#FFFDF7';
+    ctx.fillRect(0, 0, 512, 704);
+
+    // Outer colored card frame + thick comic black ink outline
+    ctx.fillStyle = style.frame;
+    ctx.fillRect(16, 16, 480, 672);
+    ctx.fillStyle = '#FFFDF7';
+    ctx.fillRect(32, 32, 448, 640);
+    ctx.strokeStyle = '#1A1816';
+    ctx.lineWidth = 18;
+    ctx.strokeRect(9, 9, 494, 686);
+
+    // Top Card Nameplate Banner + Cost/Order Medallion
+    ctx.fillStyle = '#F6EFE0';
+    ctx.fillRect(36, 36, 440, 82);
+    ctx.strokeStyle = '#1A1816';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(36, 36, 440, 82);
+
+    // Corner Number Circle (just like Card Wars AP cost circle!)
+    ctx.fillStyle = gold;
+    ctx.beginPath(); ctx.arc(82, 77, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 5; ctx.stroke();
+    ctx.fillStyle = '#1A1816';
+    ctx.font = '700 32px Trebuchet MS, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(meta.roman, 82, 78);
+
+    ctx.fillStyle = '#1A1816';
+    ctx.font = '700 32px Trebuchet MS, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(meta.shortTitle, 124, 78, 340);
+
+    // BIG Center Illustrated Art Window (matching Card Wars monster/landscape box!)
+    ctx.fillStyle = style.sky;
+    ctx.fillRect(42, 134, 428, 332);
+    ctx.strokeStyle = '#1A1816';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(42, 134, 428, 332);
+
+    // Draw unique bold cartoon-geometric artwork per card
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(46, 138, 420, 324);
+    ctx.clip();
+    drawCardArtWindow(ctx, style.art, style.frame);
+    ctx.restore();
+
+    // Subtype Ribbon Strip ("NiceLands" style bar!)
+    ctx.fillStyle = style.frame;
+    ctx.fillRect(42, 476, 428, 48);
+    ctx.strokeStyle = '#1A1816';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(42, 476, 428, 48);
+    ctx.fillStyle = '#FFFDF7';
+    ctx.font = '700 24px Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(meta.suitLabel, 256, 502, 404);
+
+    // Bottom Card Description Box (like Card Wars ability text box!)
+    ctx.fillStyle = '#FAF5E8';
+    ctx.fillRect(42, 534, 428, 126);
+    ctx.strokeStyle = '#1A1816';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(42, 534, 428, 126);
+
+    ctx.fillStyle = '#1A1816';
+    ctx.font = '600 22px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    const words = meta.title.split(' ');
+    let line1 = '';
+    let line2 = '';
+    words.forEach((w) => {
+      if ((line1 + ' ' + w).trim().length <= 30) line1 = (line1 + ' ' + w).trim();
+      else line2 = (line2 + ' ' + w).trim();
+    });
+    ctx.fillText(line1, 256, 578, 404);
+    if (line2) ctx.fillText(line2, 256, 614, 404);
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function drawCardArtWindow(ctx, artType, accent) {
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = '#1A1816';
+
+  if (artType === 'valley') {
+    // Rolling hills + golden global valley + rolling test ball
+    ctx.fillStyle = '#86EFAC';
+    ctx.beginPath();
+    ctx.moveTo(40, 470);
+    ctx.bezierCurveTo(140, 220, 210, 360, 270, 290);
+    ctx.bezierCurveTo(330, 220, 360, 440, 475, 240);
+    ctx.lineTo(475, 470);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#FDE047';
+    ctx.beginPath(); ctx.arc(368, 392, 26, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (artType === 'taxonomy') {
+    // Green Square (MCT) + Purple Hexagons (GOA / ALO)
+    ctx.fillStyle = '#0F766E';
+    ctx.fillRect(88, 220, 120, 120); ctx.strokeRect(88, 220, 120, 120);
+    ctx.fillStyle = '#6D28D9';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3;
+      const px = 345 + Math.cos(a) * 76;
+      const py = 285 + Math.sin(a) * 76;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (artType === 'triad') {
+    // MCT Square, GOA Circle, ALO Funnel side-by-side
+    ctx.fillStyle = '#0F766E';
+    ctx.fillRect(74, 240, 88, 88); ctx.strokeRect(74, 240, 88, 88);
+    ctx.fillStyle = '#1D4ED8';
+    ctx.beginPath(); ctx.arc(256, 284, 52, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#B91C1C';
+    ctx.beginPath(); ctx.moveTo(340, 232); ctx.lineTo(446, 232); ctx.lineTo(393, 344); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (artType === 'gantt') {
+    // Cloud VM Gantt blocks
+    ctx.fillStyle = '#0F766E';
+    ctx.fillRect(78, 200, 145, 58); ctx.strokeRect(78, 200, 145, 58);
+    ctx.fillStyle = '#5EEAD4';
+    ctx.fillRect(235, 200, 96, 58); ctx.strokeRect(235, 200, 96, 58);
+    ctx.fillStyle = '#FDE047';
+    ctx.fillRect(78, 290, 210, 58); ctx.strokeRect(78, 290, 210, 58);
+    ctx.fillStyle = '#0F766E';
+    ctx.fillRect(300, 290, 118, 58); ctx.strokeRect(300, 290, 118, 58);
+  } else if (artType === 'pivot') {
+    // Dual c-decay pivot at L/2
+    ctx.strokeStyle = '#1D4ED8'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(76, 180); ctx.lineTo(256, 410); ctx.lineTo(436, 418); ctx.stroke();
+    ctx.strokeStyle = '#B91C1C'; ctx.setLineDash([14, 10]); ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(256, 155); ctx.lineTo(256, 445); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#FDE047'; ctx.strokeStyle = '#1A1816'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(256, 410, 22, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (artType === 'forces') {
+    // Social force rings (Orange dashed inner, Blue outer)
+    ctx.strokeStyle = '#1D4ED8'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(256, 296, 118, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#C2410C'; ctx.setLineDash([12, 8]);
+    ctx.beginPath(); ctx.arc(256, 296, 62, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1D4ED8'; ctx.strokeStyle = '#1A1816'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(256, 296, 24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (artType === 'mountain') {
+    // 3D Topographic Rastrigin peaks
+    ctx.fillStyle = '#34D399';
+    ctx.beginPath(); ctx.moveTo(60, 440); ctx.lineTo(175, 200); ctx.lineTo(285, 440); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#0F766E';
+    ctx.beginPath(); ctx.moveTo(210, 440); ctx.lineTo(345, 175); ctx.lineTo(455, 440); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#FDE047';
+    ctx.beginPath(); ctx.arc(256, 395, 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (artType === 'bars') {
+    // Empirical benchmark bars
+    const bars = [
+      { y: 185, w: 110, c: '#B91C1C' },
+      { y: 260, w: 220, c: '#1D4ED8' },
+      { y: 335, w: 310, c: '#0F766E' }
+    ];
+    bars.forEach((b) => { ctx.fillStyle = b.c; ctx.fillRect(86, b.y, b.w, 48); ctx.strokeRect(86, b.y, b.w, 48); });
+  } else {
+    // Cheat sheet & Quiz Shield
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(256, 170); ctx.lineTo(372, 215); ctx.lineTo(346, 355); ctx.lineTo(256, 430); ctx.lineTo(166, 355); ctx.lineTo(140, 215);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#FDE047';
+    ctx.font = '700 100px Trebuchet MS, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', 256, 304);
+  }
+}
+
+function createWoodFlowerDeckTexture(THREE) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 512;
+  const ctx = c.getContext('2d');
+
+  // Sunny warm yellow wooden planks inspired by user's screenshot!
+  ctx.fillStyle = '#F5CF54';
+  ctx.fillRect(0, 0, 512, 512);
+
+  for (let y = 0; y < 512; y += 64) {
+    ctx.fillStyle = (y / 64) % 2 === 0 ? '#F7D665' : '#ECC346';
+    ctx.fillRect(0, y, 512, 64);
+    ctx.strokeStyle = 'rgba(146, 98, 18, 0.34)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+  }
+
+  // Painted subtle daisy flowers on planks (exact callback to user reference!)
+  const drawFlower = (cx, cy, r) => {
+    ctx.fillStyle = 'rgba(224, 166, 36, 0.42)';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.ellipse(cx + Math.cos(a) * r, cy + Math.sin(a) * r, r * 0.56, r * 0.34, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255, 248, 200, 0.65)';
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.45, 0, Math.PI * 2); ctx.fill();
+  };
+  drawFlower(128, 128, 38);
+  drawFlower(384, 160, 34);
+  drawFlower(256, 352, 42);
+  drawFlower(92, 412, 30);
+  drawFlower(420, 410, 36);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2.2, 1.5);
+  return tex;
+}
+
+function createSkyBackdropTexture(THREE) {
+  const c = document.createElement('canvas');
+  c.width = 1024;
+  c.height = 512;
+  const ctx = c.getContext('2d');
+
+  // Crisp Adventure Time coastal sky gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, '#38A3F1');
+  grad.addColorStop(0.55, '#64C5FA');
+  grad.addColorStop(1, '#BAE6FD');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1024, 512);
+
+  // Soft pastel rainbow arc across far right sky
+  const rCols = ['#FCA5A5', '#FDBA74', '#FDE047', '#86EFAC', '#93C5FD', '#C4B5FD'];
+  rCols.forEach((col, i) => {
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(760, 500, 340 - i * 11, Math.PI * 1.06, Math.PI * 1.94);
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // Warm cartoon sun on upper left
+  ctx.fillStyle = '#FEF08A';
+  ctx.beginPath(); ctx.arc(170, 145, 56, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#FACC15';
+  ctx.beginPath(); ctx.arc(170, 145, 40, 0, Math.PI * 2); ctx.fill();
+
+  // Fluffy layered cartoon clouds painted on sky horizon
+  const drawCloud = (x, y, s) => {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(x, y, 42 * s, 0, Math.PI * 2);
+    ctx.arc(x + 42 * s, y - 14 * s, 50 * s, 0, Math.PI * 2);
+    ctx.arc(x + 92 * s, y - 4 * s, 44 * s, 0, Math.PI * 2);
+    ctx.arc(x + 130 * s, y + 8 * s, 32 * s, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  drawCloud(70, 210, 1.05);
+  drawCloud(365, 165, 1.15);
+  drawCloud(740, 195, 1.0);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function createDieFaceTexture(THREE, pips = 5) {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#FEF08A';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.strokeStyle = '#1A1816';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, 118, 118);
+
+  const spots = {
+    1: [[64, 64]],
+    2: [[36, 36], [92, 92]],
+    3: [[36, 36], [64, 64], [92, 92]],
+    4: [[36, 36], [92, 36], [36, 92], [92, 92]],
+    5: [[36, 36], [92, 36], [64, 64], [36, 92], [92, 92]],
+    6: [[36, 32], [92, 32], [36, 64], [92, 64], [36, 96], [92, 96]]
+  }[pips] || [[64, 64]];
+  ctx.fillStyle = '#B91C1C';
+  spots.forEach(([px, py]) => {
+    ctx.beginPath(); ctx.arc(px, py, 12, 0, Math.PI * 2); ctx.fill();
+  });
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function drawButlerFaceCanvas(ctx, mood, blinking) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
   ctx.clearRect(0, 0, W, H);
-
-  // Mint-cream face screen panel
-  ctx.fillStyle = '#D7F5EA';
+  // Pastel-mint screen with crisp thick dark ink border (exact match to user's reference!)
+  ctx.fillStyle = '#D9F7ED';
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = '#1A1816';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(5, 5, W - 10, H - 10);
+  ctx.lineWidth = 14;
+  ctx.strokeRect(7, 7, W - 14, H - 14);
 
-  // Soft rosy cheeks
-  ctx.fillStyle = 'rgba(251, 113, 133, 0.55)';
-  ctx.beginPath(); ctx.ellipse(54, 118, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(202, 118, 17, 10, 0, 0, Math.PI * 2); ctx.fill();
+  // Cute soft-pink oval blush cheeks
+  ctx.fillStyle = '#F497A9';
+  ctx.beginPath(); ctx.ellipse(54, 122, 19, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(202, 122, 19, 11, 0, 0, Math.PI * 2); ctx.fill();
 
   ctx.strokeStyle = '#1A1816';
   ctx.fillStyle = '#1A1816';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // Eyes
   if (blinking) {
-    ctx.lineWidth = 8;
-    ctx.beginPath(); ctx.moveTo(64, 82); ctx.lineTo(94, 82); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(162, 82); ctx.lineTo(192, 82); ctx.stroke();
-  } else if (mood === 'greet' || mood === 'proud') {
     ctx.lineWidth = 9;
-    ctx.beginPath(); ctx.arc(80, 90, 16, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
-    ctx.beginPath(); ctx.arc(176, 90, 16, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(64, 84); ctx.lineTo(98, 84); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(158, 84); ctx.lineTo(192, 84); ctx.stroke();
+  } else if (mood === 'greet' || mood === 'proud') {
+    ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(82, 94, 18, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    ctx.beginPath(); ctx.arc(174, 94, 18, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
   } else if (mood === 'aha') {
-    ctx.beginPath(); ctx.arc(80, 82, 15, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(176, 82, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(82, 84, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(174, 84, 16, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#FDE047';
-    ctx.beginPath(); ctx.arc(74, 75, 5.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(170, 75, 5.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(76, 77, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(168, 77, 6, 0, Math.PI * 2); ctx.fill();
   } else {
     const lookShift = mood === 'point' ? 7 : 0;
-    ctx.beginPath(); ctx.arc(80 + lookShift, 84, 12, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(176 + lookShift, 84, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(82 + lookShift, 86, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(174 + lookShift, 86, 13, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath(); ctx.arc(84 + lookShift, 79, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(180 + lookShift, 79, 4, 0, Math.PI * 2); ctx.fill();
-
-    // Eyebrows for deal / think
-    ctx.lineWidth = 7;
-    if (mood === 'deal') {
-      ctx.beginPath(); ctx.moveTo(58, 56); ctx.lineTo(98, 66); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(198, 56); ctx.lineTo(158, 66); ctx.stroke();
-    } else if (mood === 'think') {
-      ctx.beginPath(); ctx.moveTo(60, 62); ctx.lineTo(96, 60); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(160, 56); ctx.quadraticCurveTo(176, 44, 196, 58); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.arc(86 + lookShift, 81, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(178 + lookShift, 81, 4.5, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Mouth
+  // Happy mouth with bright pink tongue (matching user's mascot reference!)
   ctx.fillStyle = '#1A1816';
   ctx.strokeStyle = '#1A1816';
   ctx.lineWidth = 8;
-  if (mood === 'greet' || mood === 'aha') {
+  if (mood === 'greet' || mood === 'aha' || mood === 'proud') {
     ctx.beginPath();
-    ctx.moveTo(92, 124);
-    ctx.quadraticCurveTo(128, mood === 'aha' ? 172 : 162, 164, 124);
+    ctx.moveTo(92, 122);
+    ctx.quadraticCurveTo(128, mood === 'aha' ? 168 : 158, 164, 122);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = '#FB7185';
+    ctx.fillStyle = '#F4728A';
     ctx.beginPath();
-    ctx.ellipse(128, 144, 18, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(128, 145, 18, 10, 0, 0, Math.PI * 2);
     ctx.fill();
   } else if (mood === 'point') {
-    ctx.beginPath(); ctx.ellipse(128, 134, 20, 15, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FB7185';
-    ctx.beginPath(); ctx.ellipse(128, 140, 10, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(128, 134, 19, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#F4728A';
+    ctx.beginPath(); ctx.ellipse(128, 141, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
   } else if (mood === 'think') {
-    ctx.beginPath();
-    ctx.moveTo(98, 136);
-    ctx.quadraticCurveTo(114, 124, 128, 136);
-    ctx.quadraticCurveTo(142, 148, 158, 132);
-    ctx.stroke();
-  } else if (mood === 'deal') {
-    ctx.beginPath();
-    ctx.moveTo(96, 132);
-    ctx.quadraticCurveTo(132, 148, 164, 122);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(98, 136); ctx.quadraticCurveTo(114, 124, 128, 136); ctx.quadraticCurveTo(142, 148, 158, 132); ctx.stroke();
   } else {
-    ctx.beginPath();
-    ctx.moveTo(92, 126);
-    ctx.quadraticCurveTo(128, 156, 164, 126);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(94, 126); ctx.quadraticCurveTo(128, 154, 162, 126); ctx.stroke();
   }
-}
-
-function drawPlayingCardTexture(ctx, { suit = 'concept', roman = 'I', isBack = false }) {
-  const W = ctx.canvas.width;
-  const H = ctx.canvas.height;
-  const unifiedBack = '#8C2D19';
-  const unifiedTrim = '#FDE047';
-
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = isBack ? unifiedBack : '#FFFDF7';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.strokeStyle = '#1A1816';
-  ctx.lineWidth = 14;
-  ctx.strokeRect(7, 7, W - 14, H - 14);
-
-  ctx.strokeStyle = isBack ? unifiedTrim : unifiedBack;
-  ctx.lineWidth = 8;
-  ctx.strokeRect(24, 24, W - 48, H - 48);
-
-  // Unified crest diamond on back, clean suit emblem on front
-  ctx.fillStyle = isBack ? unifiedTrim : unifiedBack;
-  ctx.beginPath();
-  if (isBack) {
-    ctx.moveTo(W / 2, H / 2 - 68);
-    ctx.lineTo(W / 2 + 52, H / 2 - 14);
-    ctx.lineTo(W / 2, H / 2 + 40);
-    ctx.lineTo(W / 2 - 52, H / 2 - 14);
-    ctx.closePath();
-    ctx.fill();
-  } else if (suit === 'mct') {
-    ctx.fillRect(W / 2 - 42, H / 2 - 58, 84, 84);
-  } else if (suit === 'goa') {
-    ctx.arc(W / 2, H / 2 - 16, 46, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (suit === 'alo') {
-    ctx.moveTo(W / 2 - 52, H / 2 - 52);
-    ctx.lineTo(W / 2 + 52, H / 2 - 52);
-    ctx.lineTo(W / 2, H / 2 + 44);
-    ctx.closePath();
-    ctx.fill();
-  } else {
-    ctx.moveTo(W / 2, H / 2 - 64);
-    ctx.lineTo(W / 2 + 48, H / 2 - 16);
-    ctx.lineTo(W / 2, H / 2 + 32);
-    ctx.lineTo(W / 2 - 48, H / 2 - 16);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.fillStyle = isBack ? unifiedBack : '#FFFDF7';
-  ctx.font = '700 44px Fredoka, Syne, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(roman, W / 2, H / 2 - 15);
-
-  ctx.fillStyle = isBack ? unifiedTrim : '#1A1816';
-  ctx.font = '700 22px JetBrains Mono, monospace';
-  ctx.fillText(isBack ? 'DEK SOKA' : `KARTU ${roman}`, W / 2, H - 52);
 }
 
 // ============================================================================
-// MAIN FULL-VIEWPORT 3D CARD WARS WORLD CLASS
+// MAIN FULL-VIEWPORT 3D TABLETOP SIMULATOR CARD WARS WORLD
 // ============================================================================
 export class CardWarsWorld {
-  constructor({ webglContainer, fallbackContainer, onModeChange } = {}) {
+  constructor({ webglContainer, fallbackContainer, cards = [], onModeChange, onCardPick, onCardHover } = {}) {
     this.webglContainer = webglContainer;
     this.fallbackContainer = fallbackContainer;
+    this.cardsMeta = cards;
     this.onModeChange = onModeChange;
-    this.mode = 'loading'; // 'webgl' | '2d'
+    this.onCardPick = onCardPick;
+    this.onCardHover = onCardHover;
+
+    this.mode = 'loading';
     this.paused = false;
+    this.interactiveTable = true;
+    this.showAllFaceUp = true; // Show ALL 9 illustrated 3D cards face-up on the table by default like Tabletop Simulator!
     this.rafId = null;
     this.clockStart = performance.now();
     this.mood = 'greet';
-    this.cameraMode = 'focus'; // 'overview' | 'focus' | 'peek'
-    this.cardState = { suit: 'concept', roman: 'I', faceDown: false };
+    this.cameraMode = 'table';
+    this.openedSet = new Set([0]);
+    this.activeIdx = 0;
+    this.hoveredIdx = -1;
+    this.cardEntries = [];
+    this.pickables = [];
     this.prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Deal flight animation state
-    this.dealAnim = { active: false, t: 1 };
-    this.shakeAmp = 0;
-    this.blinkTimer = 0;
-    this.isBlinking = false;
     this.mouseNdc = { x: 0, y: 0 };
+    this.isBlinking = false;
+    this.shakeAmp = 0;
+    this.animatedProps = { clouds: [], boat: null, waves: [], steam: [], sparkle: [], cardsFan: null, crystal: null, palms: [] };
 
-    // Smooth camera lerp targets (starts in heroic intro angle looking across table at Sir Pip)
-    this.cameraMode = 'intro';
-    this.camTargetPos = { x: 0.15, y: 2.55, z: 5.55 };
-    this.camTargetLook = { x: -0.45, y: 0.90, z: -0.60 };
-    this.camCurrentLook = { x: -0.45, y: 0.90, z: -0.60 };
+    // Angled Coastal Tabletop Simulator camera: frames ALL 9 big 3D cards + hero Sir Pip + ocean/sky horizon!
+    this.camTargetPos = { x: 0.0, y: 3.72, z: 5.82 };
+    this.camTargetLook = { x: 0.0, y: 0.52, z: -0.45 };
+    this.camCurrentLook = { x: 0.0, y: 0.52, z: -0.45 };
   }
 
   async init(prefer2D = false) {
@@ -432,6 +711,9 @@ export class CardWarsWorld {
 
     try {
       this.THREE = THREE;
+      this.raycaster = new THREE.Raycaster();
+      this.pointerVec = new THREE.Vector2(-9, -9);
+
       this.webglContainer.innerHTML = '';
       if (this.fallbackContainer) this.fallbackContainer.classList.add('hidden');
       this.webglContainer.classList.remove('hidden');
@@ -440,9 +722,9 @@ export class CardWarsWorld {
       const h = Math.max(240, window.innerHeight);
 
       this.scene = new THREE.Scene();
-      this.scene.background = createSkyTexture(THREE);
+      this.scene.background = new THREE.Color(0x4AB6F7);
 
-      this.camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 120);
+      this.camera = new THREE.PerspectiveCamera(48, w / h, 0.1, 120);
       this.camera.position.set(this.camTargetPos.x, this.camTargetPos.y, this.camTargetPos.z);
       this.camera.lookAt(this.camCurrentLook.x, this.camCurrentLook.y, this.camCurrentLook.z);
 
@@ -452,7 +734,6 @@ export class CardWarsWorld {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
       this.webglContainer.appendChild(this.renderer.domElement);
 
-      // Graceful WebGL context loss fallback
       this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
         e.preventDefault();
         this._activate2DFallback();
@@ -460,25 +741,22 @@ export class CardWarsWorld {
 
       this.gradMap = createToonGradientMap(THREE);
       this._setupLights();
-      this._buildEnvironment();
-      this._buildCardWarsTable();
+      this._buildCoastalWorldBackdrop();
+      this._buildTabletopArena();
+      this._buildTabletopProps();
       this._buildButlerSirPip();
-      this._buildActiveCardAndParticles();
+      this._buildNineTableCards();
 
       this.mode = 'webgl';
       this.onModeChange && this.onModeChange('webgl');
 
       window.addEventListener('mousemove', this._onMouseMove, { passive: true });
+      this.renderer.domElement.addEventListener('click', this._onCanvasClick);
       this._startLoop();
     } catch {
       this._activate2DFallback();
     }
   }
-
-  _onMouseMove = (e) => {
-    this.mouseNdc.x = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
-    this.mouseNdc.y = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
-  };
 
   _toonMat(hex) {
     return new this.THREE.MeshToonMaterial({ color: hex, gradientMap: this.gradMap });
@@ -486,162 +764,436 @@ export class CardWarsWorld {
 
   _setupLights() {
     const THREE = this.THREE;
-    const amb = new THREE.AmbientLight(0xFFFDF5, 1.15);
-    this.scene.add(amb);
-
-    const sun = new THREE.DirectionalLight(0xFFF8DC, 1.65);
-    sun.position.set(6, 11, 7);
+    this.scene.add(new THREE.AmbientLight(0xFFFDF5, 1.3));
+    const sun = new THREE.DirectionalLight(0xFFF9E6, 1.45);
+    sun.position.set(5, 12, 6);
     this.scene.add(sun);
-
-    const rim = new THREE.DirectionalLight(0x7DD3FC, 0.55);
-    rim.position.set(-7, 5, -5);
-    this.scene.add(rim);
+    const fill = new THREE.DirectionalLight(0xBAE6FD, 0.45);
+    fill.position.set(-7, 6, -5);
+    this.scene.add(fill);
   }
 
-  _buildEnvironment() {
+  _buildCoastalWorldBackdrop() {
     const THREE = this.THREE;
+    this.animatedProps = { clouds: [], boat: null, waves: [], steam: [], sparkle: [], cardsFan: null, crystal: null, palms: [] };
 
-    // Sandy beach floor
-    const sand = new THREE.Mesh(new THREE.PlaneGeometry(70, 34), this._toonMat(0xF6DF98));
-    sand.rotation.x = -Math.PI / 2;
-    sand.position.set(0, -1.55, 2);
-    this.scene.add(sand);
+    // 1. Vivid Coastal Sky Backdrop Wall with sun, pastel rainbow & clouds
+    const skyTex = createSkyBackdropTexture(THREE);
+    const skyWall = new THREE.Mesh(
+      new THREE.PlaneGeometry(54, 18),
+      new THREE.MeshBasicMaterial({ map: skyTex })
+    );
+    skyWall.position.set(0, 5.2, -16.5);
+    this.scene.add(skyWall);
 
-    // Distant calm ocean strip
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(90, 26), this._toonMat(0x1E88C7));
-    sea.rotation.x = -Math.PI / 2;
-    sea.position.set(0, -1.52, -23);
-    this.scene.add(sea);
+    // 2. Sparkling Blue Cartoon Ocean + Crisp White Shoreline Foam
+    const ocean = new THREE.Mesh(
+      new THREE.PlaneGeometry(56, 20),
+      new THREE.MeshBasicMaterial({ color: 0x1783B8 })
+    );
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.position.set(0, -0.42, -11.5);
+    this.scene.add(ocean);
 
-    // Foam shoreline band
-    const foam = new THREE.Mesh(new THREE.PlaneGeometry(90, 0.9), new THREE.MeshBasicMaterial({ color: 0xE0F7FF }));
+    const foam = new THREE.Mesh(
+      new THREE.PlaneGeometry(52, 0.55),
+      new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+    );
     foam.rotation.x = -Math.PI / 2;
-    foam.position.set(0, -1.50, -10.1);
+    foam.position.set(0, -0.39, -5.2);
     this.scene.add(foam);
+    this.animatedProps.waves.push(foam);
 
-    // 3 Cartoon Distant Island Rocks
-    [
-      { x: -7.5, z: -15.5, r: 2.3, h: 2.4, c: 0x5D7D7E },
-      { x: 5.8, z: -16.8, r: 2.7, h: 2.8, c: 0x678B87 },
-      { x: 9.8, z: -14.4, r: 1.7, h: 1.9, c: 0x587778 }
-    ].forEach((rock) => {
-      const m = new THREE.Mesh(new THREE.ConeGeometry(rock.r, rock.h, 6), this._toonMat(rock.c));
-      m.position.set(rock.x, -1.52 + rock.h * 0.42, rock.z);
-      addToonOutline(THREE, m, 1.045);
-      this.scene.add(m);
+    // Extra drifting ocean wave crests
+    [[-6.5, -7.8], [-1.8, -9.2], [4.6, -8.4], [8.8, -10.5], [-9.2, -11.0]].forEach(([wx, wz]) => {
+      const crest = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.1, 0.18),
+        new THREE.MeshBasicMaterial({ color: 0xE0F2FE, transparent: true, opacity: 0.85 })
+      );
+      crest.rotation.x = -Math.PI / 2;
+      crest.position.set(wx, -0.38, wz);
+      this.scene.add(crest);
+      this.animatedProps.waves.push(crest);
     });
 
-    // Stylized emerald grass tufts on beach
-    const grassGeo = new THREE.ConeGeometry(0.16, 0.62, 4);
-    const grassMat = this._toonMat(0x1E9E66);
-    [[-4.2, -5.8], [-3.8, -5.5], [4.1, -6.1], [4.5, -5.7], [-1.6, -6.5], [2.4, -6.3]].forEach(([gx, gz]) => {
-      const blade = new THREE.Mesh(grassGeo, grassMat);
-      blade.position.set(gx, -1.25, gz);
-      blade.rotation.z = (gx % 2) * 0.14;
-      addToonOutline(THREE, blade, 1.09);
-      this.scene.add(blade);
+    // 3. Warm Coastal Sandy Beach surrounding the wooden tabletop pier
+    const beach = new THREE.Mesh(
+      new THREE.PlaneGeometry(52, 14),
+      this._toonMat(0xF3DF9E)
+    );
+    beach.rotation.x = -Math.PI / 2;
+    beach.position.set(0, -0.40, 1.8);
+    this.scene.add(beach);
+
+    // 4. Distant Green Adventure Time Islands + Candy Kingdom Castle Spires!
+    const buildIsland = (x, z, r, h, hasSpire = false) => {
+      const g = new THREE.Group();
+      const hill = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), this._toonMat(0x4ADE80));
+      hill.scale.set(1.35, h / r, 0.9);
+      addToonOutline(THREE, hill, 1.03);
+      g.add(hill);
+      if (hasSpire) {
+        const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.34, 1.8, 10), this._toonMat(0xF9A8D4));
+        tower.position.set(0, h + 0.6, 0);
+        addToonOutline(THREE, tower, 1.07);
+        g.add(tower);
+        const roof = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.85, 10), this._toonMat(0xEC4899));
+        roof.position.set(0, h + 1.85, 0);
+        addToonOutline(THREE, roof, 1.07);
+        g.add(roof);
+        const sideT = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.15, 8), this._toonMat(0xFDE047));
+        sideT.position.set(-0.55, h + 0.3, 0.15);
+        addToonOutline(THREE, sideT, 1.08);
+        g.add(sideT);
+      }
+      g.position.set(x, -0.44, z);
+      this.scene.add(g);
+    };
+    buildIsland(-10.5, -12.6, 2.8, 1.7, true);
+    buildIsland(10.8, -12.8, 3.1, 1.9, false);
+    buildIsland(4.8, -13.8, 2.1, 1.25, true);
+
+    // 5. Cute Cartoon Sailboat bobbing gently on the blue ocean!
+    const boat = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.32, 0.48), this._toonMat(0xB45309));
+    hull.position.y = 0.14;
+    addToonOutline(THREE, hull, 1.08);
+    boat.add(hull);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 1.25, 8), this._toonMat(0x78350F));
+    mast.position.set(0, 0.78, 0);
+    boat.add(mast);
+    const sail = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.95, 3), this._toonMat(0xEF4444));
+    sail.position.set(0.14, 0.84, 0);
+    sail.rotation.y = Math.PI / 2;
+    addToonOutline(THREE, sail, 1.06);
+    boat.add(sail);
+    boat.position.set(-4.8, -0.42, -9.2);
+    this.scene.add(boat);
+    this.animatedProps.boat = boat;
+
+    // 6. Stylized Coastal Palm Trees flanking the background (Left & Right)
+    const buildPalm = (x, z, tilt = 0.16, scale = 1.0) => {
+      const palm = new THREE.Group();
+      for (let seg = 0; seg < 4; seg++) {
+        const piece = new THREE.Mesh(new THREE.CylinderGeometry(0.11 - seg * 0.015, 0.14 - seg * 0.015, 0.65, 8), this._toonMat(0xA16207));
+        piece.position.set(seg * tilt * 0.32, 0.32 + seg * 0.56, 0);
+        piece.rotation.z = -tilt * (seg + 0.5) * 0.55;
+        addToonOutline(THREE, piece, 1.1);
+        palm.add(piece);
+      }
+      const crown = new THREE.Group();
+      crown.position.set(3.2 * tilt * 0.32, 2.52, 0);
+      for (let f = 0; f < 5; f++) {
+        const a = (f / 5) * Math.PI * 2;
+        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.15, 5), this._toonMat(0x16A34A));
+        leaf.position.set(Math.cos(a) * 0.48, 0.05, Math.sin(a) * 0.48);
+        leaf.rotation.z = -Math.PI / 2.5;
+        leaf.rotation.y = -a;
+        addToonOutline(THREE, leaf, 1.07);
+        crown.add(leaf);
+      }
+      const coconut = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), this._toonMat(0x78350F));
+      coconut.position.set(0, -0.1, 0.12);
+      crown.add(coconut);
+      palm.add(crown);
+      palm.position.set(x, -0.40, z);
+      palm.scale.setScalar(scale);
+      this.scene.add(palm);
+      this.animatedProps.palms.push({ group: palm, phase: x * 0.7 });
+    };
+    buildPalm(-7.8, -5.6, 0.24, 1.18);
+    buildPalm(7.9, -5.8, -0.22, 1.15);
+    buildPalm(-9.6, -8.4, 0.18, 0.92);
+    buildPalm(9.5, -8.8, -0.16, 0.95);
+
+    // 7. Fluffy 3D Floating Cartoon Clouds drifting slowly across the sky
+    const buildCloud = (x, y, z, s = 1.0) => {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+      [[-0.55, 0, 0, 0.48], [0, 0.22, 0, 0.62], [0.6, 0.04, 0, 0.50], [1.05, -0.06, 0, 0.36]].forEach(([cx, cy, cz, r]) => {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), mat);
+        puff.position.set(cx, cy, cz);
+        g.add(puff);
+      });
+      g.position.set(x, y, z);
+      g.scale.setScalar(s);
+      this.scene.add(g);
+      this.animatedProps.clouds.push({ group: g, baseX: x, speed: 0.14 + (Math.abs(x) % 3) * 0.04 });
+    };
+    buildCloud(-7.2, 2.3, -13.2, 1.15);
+    buildCloud(0.6, 2.75, -14.2, 1.25);
+    buildCloud(6.8, 2.2, -13.5, 1.1);
+
+    // 8. Festive Overhead Bunting Pennant Flags strung behind the table!
+    const postMat = this._toonMat(0x78350F);
+    [-6.1, 6.1].forEach((px) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 2.85, 8), postMat);
+      post.position.set(px, 1.05, -4.15);
+      addToonOutline(THREE, post, 1.09);
+      this.scene.add(post);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), this._toonMat(0xFACC15));
+      knob.position.set(px, 2.52, -4.15);
+      addToonOutline(THREE, knob, 1.1);
+      this.scene.add(knob);
     });
+    const flagColors = [0xEF4444, 0xFACC15, 0x10B981, 0x3B82F6, 0xF97316, 0xA855F7];
+    for (let i = 0; i < 13; i++) {
+      const t = i / 12;
+      const fx = -5.6 + t * 11.2;
+      const sag = Math.sin(t * Math.PI) * 0.52;
+      const flag = new THREE.Mesh(
+        new THREE.ConeGeometry(0.24, 0.44, 3),
+        this._toonMat(flagColors[i % flagColors.length])
+      );
+      flag.rotation.z = Math.PI;
+      flag.position.set(fx, 2.38 - sag, -4.12);
+      addToonOutline(THREE, flag, 1.08);
+      this.scene.add(flag);
+    }
   }
 
-  _buildCardWarsTable() {
+  _buildTabletopArena() {
     const THREE = this.THREE;
-    const tableGroup = new THREE.Group();
+    // Sunny Yellow Flower-Wood Tabletop Island (exact reference feel!) with crisp comic black border
+    const woodTex = createWoodFlowerDeckTexture(THREE);
+    const tableSlab = new THREE.Mesh(
+      new THREE.BoxGeometry(12.8, 0.42, 7.6),
+      [
+        this._toonMat(0x1A1816), this._toonMat(0x1A1816),
+        new THREE.MeshBasicMaterial({ map: woodTex }),
+        this._toonMat(0x1A1816), this._toonMat(0x1A1816), this._toonMat(0x1A1816)
+      ]
+    );
+    tableSlab.position.set(0, -0.22, -0.15);
+    this.scene.add(tableSlab);
 
-    // Stacked dark charcoal/teal tire pedestal (inspired by Card Wars beach table)
-    const tireMat = this._toonMat(0x2E3B37);
-    for (let i = 0; i < 2; i++) {
-      const tire = new THREE.Mesh(new THREE.CylinderGeometry(1.42, 1.48, 0.72, 18), tireMat);
-      tire.position.set(0, -1.16 + i * 0.70, -0.35);
-      addToonOutline(THREE, tire, 1.04);
-      tableGroup.add(tire);
+    // Bold black outer rim trim along the tabletop
+    const tableRim = new THREE.Mesh(
+      new THREE.BoxGeometry(13.02, 0.36, 7.82),
+      new THREE.MeshBasicMaterial({ color: 0x1A1816 })
+    );
+    tableRim.position.set(0, -0.24, -0.15);
+    this.scene.add(tableRim);
+
+    // Classic Card Wars green baize inner frame under the playmat
+    const baize = new THREE.Mesh(
+      new THREE.BoxGeometry(8.15, 0.036, 5.45),
+      this._toonMat(0x5B8C61)
+    );
+    baize.position.set(0, -0.008, 0.02);
+    addToonOutline(THREE, baize, 1.015);
+    this.scene.add(baize);
+
+    const matTex = createPlaymatTexture(THREE);
+    const playmat = new THREE.Mesh(
+      new THREE.BoxGeometry(7.6, 0.044, 4.95),
+      [
+        this._toonMat(0x1A1816), this._toonMat(0x1A1816),
+        new THREE.MeshBasicMaterial({ map: matTex }),
+        this._toonMat(0x1A1816), this._toonMat(0x1A1816), this._toonMat(0x1A1816)
+      ]
+    );
+    playmat.position.set(0, 0.018, 0.02);
+    this.scene.add(playmat);
+  }
+
+  _buildTabletopProps() {
+    const THREE = this.THREE;
+    const boxTexL = drawDeckBoxTexture(THREE, '#B6A6D8');
+    const boxTexR = drawDeckBoxTexture(THREE, '#A5B4FC');
+
+    // 1. Twin Card Wars Deck Boxes
+    const boxLeft = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.88, 1.28), new THREE.MeshBasicMaterial({ map: boxTexL }));
+    boxLeft.position.set(-5.05, 0.44, -2.05);
+    boxLeft.rotation.y = 0.28;
+    addToonOutline(THREE, boxLeft, 1.05);
+    this.scene.add(boxLeft);
+
+    const boxRight = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.88, 1.28), new THREE.MeshBasicMaterial({ map: boxTexR }));
+    boxRight.position.set(5.15, 0.44, -1.75);
+    boxRight.rotation.y = -0.34;
+    addToonOutline(THREE, boxRight, 1.05);
+    this.scene.add(boxRight);
+
+    // 2. Draw Pile & Discard Pile (Thick 3D Stacked Card Wars Decks!)
+    const buildDeckStack = (x, z, rotY, count = 10) => {
+      const g = new THREE.Group();
+      for (let i = 0; i < count; i++) {
+        const c = new THREE.Mesh(
+          new THREE.BoxGeometry(0.86, 0.032, 1.18),
+          this._toonMat(i === count - 1 ? 0x8C2D19 : i % 2 === 0 ? 0xFFFDF7 : 0xEADBC4)
+        );
+        c.position.set((i % 3 - 1) * 0.012, 0.016 + i * 0.034, ((i * 7) % 3 - 1) * 0.012);
+        c.rotation.y = (i === count - 1 ? 0.09 : 0);
+        if (i === count - 1) addToonOutline(THREE, c, 1.05);
+        g.add(c);
+      }
+      const crest = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.015, 0.38), this._toonMat(0xFACC15));
+      crest.position.set(0, count * 0.034 + 0.01, 0);
+      crest.rotation.y = Math.PI / 4 + 0.09;
+      g.add(crest);
+      g.position.set(x, 0.01, z);
+      g.rotation.y = rotY;
+      this.scene.add(g);
+    };
+    buildDeckStack(-4.85, 1.65, 0.14, 11);
+    buildDeckStack(4.92, 1.55, -0.18, 8);
+
+    // 3. Four Velvet Drawstring Token Pouches + Spilled Gold Coins
+    const makePouch = (x, z, colorHex) => {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 10), this._toonMat(colorHex));
+      body.scale.set(1, 0.88, 1);
+      body.position.y = 0.29;
+      addToonOutline(THREE, body, 1.08);
+      g.add(body);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.13, 0.21, 10), this._toonMat(colorHex));
+      neck.position.y = 0.55;
+      addToonOutline(THREE, neck, 1.09);
+      g.add(neck);
+      const tie = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 6, 12), this._toonMat(0xFACC15));
+      tie.rotation.x = Math.PI / 2;
+      tie.position.y = 0.48;
+      g.add(tie);
+      g.position.set(x, 0, z);
+      this.scene.add(g);
+    };
+    makePouch(-4.72, -0.45, 0x9E3424);
+    makePouch(-5.32, 0.35, 0x2C5AA0);
+    makePouch(4.78, -0.35, 0x2C5AA0);
+    makePouch(5.38, 0.42, 0x9E3424);
+
+    // 4. Stacked Red & Gold HP / Victory Counter Tokens
+    const buildTokenStack = (x, z, n, col) => {
+      for (let i = 0; i < n; i++) {
+        const chip = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.065, 14), this._toonMat(i % 2 === 0 ? col : 0xFACC15));
+        chip.position.set(x + (i % 2) * 0.018, 0.035 + i * 0.068, z);
+        addToonOutline(THREE, chip, 1.08);
+        this.scene.add(chip);
+      }
+    };
+    buildTokenStack(-4.45, 0.55, 5, 0xDC2626);
+    buildTokenStack(-4.02, 0.72, 3, 0xFACC15);
+    buildTokenStack(4.35, 0.52, 4, 0x0F766E);
+
+    // 5. Polyhedral Dice Set: Spotted D6 + Crimson D20 + Emerald D8!
+    const d6Mats = [1, 6, 5, 2, 3, 4].map((p) => new THREE.MeshBasicMaterial({ map: createDieFaceTexture(THREE, p) }));
+    const die6 = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.36, 0.36), d6Mats);
+    die6.position.set(-3.85, 0.18, -2.52);
+    die6.rotation.y = 0.46;
+    addToonOutline(THREE, die6, 1.08);
+    this.scene.add(die6);
+
+    const die20 = new THREE.Mesh(new THREE.IcosahedronGeometry(0.24, 0), this._toonMat(0xDC2626));
+    die20.position.set(-3.28, 0.22, -2.72);
+    die20.rotation.set(0.4, 0.8, 0.2);
+    addToonOutline(THREE, die20, 1.1);
+    this.scene.add(die20);
+
+    const die8 = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), this._toonMat(0x10B981));
+    die8.position.set(3.55, 0.22, -2.62);
+    die8.rotation.set(0.3, 0.5, 0.3);
+    addToonOutline(THREE, die8, 1.1);
+    this.scene.add(die8);
+
+    // 6. Card Wars / Metaheuristic Thematic Miniatures on Table Corners!
+    // Left-rear: Mini ALO Sand-Funnel Hourglass!
+    const hourglass = new THREE.Group();
+    const hgBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.30, 0.08, 12), this._toonMat(0x92400E));
+    hgBase.position.y = 0.04;
+    const hgTop = hgBase.clone();
+    hgTop.position.y = 0.88;
+    const coneBot = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.40, 12), this._toonMat(0xFDE68A));
+    coneBot.position.y = 0.28;
+    const coneTop = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.40, 12), this._toonMat(0xF59E0B));
+    coneTop.rotation.z = Math.PI;
+    coneTop.position.y = 0.64;
+    [hgBase, hgTop, coneBot, coneTop].forEach((m) => { addToonOutline(THREE, m, 1.08); hourglass.add(m); });
+    hourglass.position.set(-2.55, 0.0, -2.92);
+    this.scene.add(hourglass);
+
+    // Right-rear: Glowing Blue Crystal Spire (GOA / Blue Plains Land Mini!)
+    const crystalGroup = new THREE.Group();
+    const cPed = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 0.16, 8), this._toonMat(0x334155));
+    cPed.position.y = 0.08;
+    addToonOutline(THREE, cPed, 1.08);
+    crystalGroup.add(cPed);
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.34, 0), this._toonMat(0x38BDF8));
+    crystal.scale.set(0.75, 1.55, 0.75);
+    crystal.position.y = 0.66;
+    addToonOutline(THREE, crystal, 1.09);
+    crystalGroup.add(crystal);
+    crystalGroup.position.set(2.68, 0.0, -2.95);
+    this.scene.add(crystalGroup);
+    this.animatedProps.crystal = crystal;
+
+    // Right-mid: Cute Miniature Cornfield Watchtower + Warm Ceramic Coffee Mug!
+    const tower = new THREE.Group();
+    const tBody = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.30, 0.78, 8), this._toonMat(0xFBBF24));
+    tBody.position.y = 0.39;
+    addToonOutline(THREE, tBody, 1.07);
+    tower.add(tBody);
+    const tRoof = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.44, 8), this._toonMat(0xB91C1C));
+    tRoof.position.y = 0.98;
+    addToonOutline(THREE, tRoof, 1.07);
+    tower.add(tRoof);
+    tower.position.set(4.12, 0.0, -2.85);
+    this.scene.add(tower);
+
+    // Ceramic Coffee Mug on far right with floating cartoon steam puffs
+    const mug = new THREE.Group();
+    const mugCup = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.23, 0.48, 12), this._toonMat(0xFFFDF7));
+    mugCup.position.y = 0.24;
+    addToonOutline(THREE, mugCup, 1.08);
+    mug.add(mugCup);
+    const mugCoffee = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.02, 12), new THREE.MeshBasicMaterial({ color: 0x5C3317 }));
+    mugCoffee.position.y = 0.47;
+    mug.add(mugCoffee);
+    const mugHandle = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.04, 6, 12, Math.PI), this._toonMat(0xFFFDF7));
+    mugHandle.position.set(0.25, 0.25, 0);
+    mugHandle.rotation.z = -Math.PI / 2;
+    mug.add(mugHandle);
+    mug.position.set(5.55, 0.0, -0.52);
+    this.scene.add(mug);
+
+    for (let s = 0; s < 3; s++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.08 + s * 0.02, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.65 }));
+      puff.position.set(5.55, 0.62 + s * 0.26, -0.52);
+      this.scene.add(puff);
+      this.animatedProps.steam.push({ mesh: puff, offset: s * 0.33 });
     }
 
-    // Main Yellow-Gold Card Wars Wooden Tabletop
-    const topTex = createTabletopTexture(THREE);
-    const edgeMat = this._toonMat(0xC78A1F);
-    const topMat = new THREE.MeshToonMaterial({ map: topTex, gradientMap: this.gradMap });
-    const tableTop = new THREE.Mesh(
-      new THREE.BoxGeometry(6.8, 0.28, 3.65),
-      [edgeMat, edgeMat, topMat, edgeMat, edgeMat, edgeMat]
-    );
-    tableTop.position.set(0, 0.04, -0.35);
-    addToonOutline(THREE, tableTop, 1.018);
-    tableGroup.add(tableTop);
-
-    // Dual-Lane Card Wars Battle Board on Tabletop
-    const blueLane = new THREE.Mesh(
-      new THREE.BoxGeometry(1.56, 0.06, 1.72),
-      new THREE.MeshToonMaterial({ map: createBoardLaneTexture(THREE, '#2B6CB0', '#60A5FA'), gradientMap: this.gradMap })
-    );
-    blueLane.position.set(-0.79, 0.21, -0.25);
-    tableGroup.add(blueLane);
-
-    const amberLane = new THREE.Mesh(
-      new THREE.BoxGeometry(1.56, 0.06, 1.72),
-      new THREE.MeshToonMaterial({ map: createBoardLaneTexture(THREE, '#B7791F', '#F6AD55'), gradientMap: this.gradMap })
-    );
-    amberLane.position.set(0.79, 0.21, -0.25);
-    tableGroup.add(amberLane);
-
-    // Far-Edge Props: Lemonade Pitcher, Card Box, 2 Miniature Mugs
-    // 1. Lemonade Pitcher
-    const pitcherGroup = new THREE.Group();
-    const pitcherBody = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.76, 12), this._toonMat(0xFEF08A));
-    pitcherBody.position.y = 0.38;
-    addToonOutline(THREE, pitcherBody, 1.07);
-    pitcherGroup.add(pitcherBody);
-    const lemon = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10), this._toonMat(0xFACC15));
-    lemon.rotation.z = Math.PI / 3;
-    lemon.position.set(0.24, 0.76, 0.04);
-    addToonOutline(THREE, lemon, 1.1);
-    pitcherGroup.add(lemon);
-    pitcherGroup.position.set(-0.45, 0.18, -1.65);
-    tableGroup.add(pitcherGroup);
-
-    // 2. Deck Storage Box
-    const deckBox = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.42, 0.48), this._toonMat(0xC49A6C));
-    deckBox.position.set(0.85, 0.39, -1.65);
-    deckBox.rotation.y = -0.14;
-    addToonOutline(THREE, deckBox, 1.06);
-    tableGroup.add(deckBox);
-
-    // 3. Two Tiny Cartoon Mugs
-    const mug1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.15, 0.32, 10), this._toonMat(0xFFFDF7));
-    mug1.position.set(1.62, 0.34, -1.58);
-    addToonOutline(THREE, mug1, 1.08);
-    tableGroup.add(mug1);
-
-    const mug2 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.15, 0.32, 10), this._toonMat(0xFDE68A));
-    mug2.position.set(2.05, 0.34, -1.52);
-    addToonOutline(THREE, mug2, 1.08);
-    tableGroup.add(mug2);
-
-    this.scene.add(tableGroup);
+    // 7. Floating golden sparkle stars subtly drifting over the tabletop!
+    for (let k = 0; k < 10; k++) {
+      const star = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.065, 0),
+        new THREE.MeshBasicMaterial({ color: k % 2 === 0 ? 0xFDE047 : 0xFFFFFF, transparent: true, opacity: 0.8 })
+      );
+      const sx = -4.8 + (k / 9) * 9.6;
+      const sz = -2.6 + ((k * 37) % 10) * 0.42;
+      star.position.set(sx, 0.6 + (k % 3) * 0.45, sz);
+      this.scene.add(star);
+      this.animatedProps.sparkle.push({ mesh: star, baseY: star.position.y, phase: k * 0.9 });
+    }
   }
 
   _buildButlerSirPip() {
     const THREE = this.THREE;
+    // Exact 3D Recreation of User's Uploaded Sir Pip Mascot!
     this.butlerRoot = new THREE.Group();
-    // Seated clearly across the far-left edge of the table so visible even while Shorts stage is open!
-    this.butlerRoot.position.set(-2.42, 0.22, -1.58);
-    this.butlerRoot.rotation.y = 0.42;
-
-    // Chair seat under Butler
-    const stool = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.16, 0.9), this._toonMat(0xF1F5F9));
-    stool.position.set(0, -0.12, -0.12);
-    addToonOutline(THREE, stool, 1.05);
-    this.butlerRoot.add(stool);
+    this.butlerRoot.position.set(0.0, 0.04, -2.92);
+    this.butlerRoot.scale.setScalar(1.22);
 
     this.butlerUpper = new THREE.Group();
     this.butlerRoot.add(this.butlerUpper);
 
-    // Rounded BMO x Peppermint Butler Body Block (Mint-Teal)
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.12, 1.38, 0.78), this._toonMat(0x74D1B8));
+    // 1. Boxy Mint-Teal Console Upper Body (#72D6B4) with bold comic ink outline
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.12, 1.36, 0.72), this._toonMat(0x72D6B4));
     body.position.set(0, 0.74, 0);
-    addToonOutline(THREE, body, 1.055);
+    addToonOutline(THREE, body, 1.06);
     this.butlerUpper.add(body);
 
-    // Dynamic 2D Facial Expression Plate on Front of Head
+    // 2. Recessed Pastel-Mint Face Screen with Blush, Happy Eyes & Pink Tongue!
     this.faceCanvas = document.createElement('canvas');
     this.faceCanvas.width = 256;
     this.faceCanvas.height = 192;
@@ -650,180 +1202,215 @@ export class CardWarsWorld {
     this.faceTex = new THREE.CanvasTexture(this.faceCanvas);
     this.faceTex.colorSpace = THREE.SRGBColorSpace;
 
-    const facePlate = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.92, 0.68),
-      new THREE.MeshBasicMaterial({ map: this.faceTex })
-    );
-    facePlate.position.set(0, 0.98, 0.402);
+    const facePlate = new THREE.Mesh(new THREE.PlaneGeometry(0.90, 0.66), new THREE.MeshBasicMaterial({ map: this.faceTex }));
+    facePlate.position.set(0, 0.96, 0.372);
     this.butlerUpper.add(facePlate);
 
-    // Tailored Navy Tuxedo Vest + Crisp White Shirt Front + Crimson Bow Tie
-    const tux = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.56, 0.82), this._toonMat(0x1E293B));
+    // 3. Navy-Charcoal Tuxedo Lower Jacket (#1D2939) + Crisp Rectangular White Tuxedo Shirt!
+    const tux = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.56, 0.76), this._toonMat(0x1D2939));
     tux.position.set(0, 0.30, 0);
-    addToonOutline(THREE, tux, 1.045);
+    addToonOutline(THREE, tux, 1.05);
     this.butlerUpper.add(tux);
 
-    const shirt = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.44), new THREE.MeshBasicMaterial({ color: 0xFFFDF7 }));
-    shirt.position.set(0, 0.34, 0.418);
-    this.butlerUpper.add(shirt);
+    const whiteShirt = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.42, 0.48),
+      new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+    );
+    whiteShirt.position.set(0, 0.29, 0.392);
+    this.butlerUpper.add(whiteShirt);
 
-    const bowLeft = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 4), this._toonMat(0xDC2626));
+    // 4. Classic Red Bowtie (two crisp triangles) + Bright Yellow Circular Center Knot!
+    const bowtieGroup = new THREE.Group();
+    bowtieGroup.position.set(0, 0.51, 0.415);
+    const wingGeo = new THREE.ConeGeometry(0.14, 0.26, 3);
+    const bowLeft = new THREE.Mesh(wingGeo, this._toonMat(0xDC2626));
     bowLeft.rotation.z = -Math.PI / 2;
-    bowLeft.position.set(-0.11, 0.50, 0.44);
+    bowLeft.position.x = -0.13;
     addToonOutline(THREE, bowLeft, 1.12);
-    this.butlerUpper.add(bowLeft);
+    bowtieGroup.add(bowLeft);
 
-    const bowRight = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 4), this._toonMat(0xDC2626));
+    const bowRight = new THREE.Mesh(wingGeo, this._toonMat(0xDC2626));
     bowRight.rotation.z = Math.PI / 2;
-    bowRight.position.set(0.11, 0.50, 0.44);
+    bowRight.position.x = 0.13;
     addToonOutline(THREE, bowRight, 1.12);
-    this.butlerUpper.add(bowRight);
+    bowtieGroup.add(bowRight);
 
-    const bowPin = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), this._toonMat(0xFDE047));
-    bowPin.position.set(0, 0.50, 0.46);
-    this.butlerUpper.add(bowPin);
+    const bowKnot = new THREE.Mesh(new THREE.SphereGeometry(0.068, 10, 8), this._toonMat(0xFACC15));
+    bowKnot.position.z = 0.03;
+    addToonOutline(THREE, bowKnot, 1.14);
+    bowtieGroup.add(bowKnot);
+    this.butlerUpper.add(bowtieGroup);
 
-    // Jaunty Tilted Miniature Butler Cap
+    // 5. Sleek Tilted Wide-Brim Navy Top Hat + Bright Yellow-Gold Band!
     this.butlerCap = new THREE.Group();
-    const capTop = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.35, 0.34, 12), this._toonMat(0x1E293B));
-    capTop.position.y = 0.20;
-    addToonOutline(THREE, capTop, 1.08);
-    this.butlerCap.add(capTop);
-
-    const capBand = new THREE.Mesh(new THREE.CylinderGeometry(0.355, 0.36, 0.08, 12), this._toonMat(0xFDE047));
-    capBand.position.y = 0.08;
-    this.butlerCap.add(capBand);
-
-    const capBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.05, 14), this._toonMat(0x1E293B));
-    capBrim.position.y = 0.03;
-    addToonOutline(THREE, capBrim, 1.07);
+    const capBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.52, 0.075, 16), this._toonMat(0x1D2939));
+    capBrim.position.y = 0.04;
+    addToonOutline(THREE, capBrim, 1.08);
     this.butlerCap.add(capBrim);
 
-    this.butlerCap.position.set(-0.08, 1.44, 0.02);
-    this.butlerCap.rotation.z = 0.16;
+    const capCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.34, 0.36, 16), this._toonMat(0x1D2939));
+    capCrown.position.y = 0.24;
+    addToonOutline(THREE, capCrown, 1.08);
+    this.butlerCap.add(capCrown);
+
+    const capBand = new THREE.Mesh(new THREE.CylinderGeometry(0.355, 0.352, 0.085, 16), this._toonMat(0xFACC15));
+    capBand.position.y = 0.11;
+    this.butlerCap.add(capBand);
+
+    this.butlerCap.position.set(-0.08, 1.41, 0.02);
+    this.butlerCap.rotation.z = 0.17;
     this.butlerUpper.add(this.butlerCap);
 
-    // Articulated Left Arm (Gestures toward board: point / aha / think / greet)
+    // 6. Raised Waving Navy Arm + Round Mint-Teal Hand Sphere (Viewer's Right, matching reference!)
     this.leftArmPivot = new THREE.Group();
-    this.leftArmPivot.position.set(0.62, 0.58, 0.06);
-    const lArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.68, 8), this._toonMat(0x1E293B));
-    lArmMesh.position.set(0.24, -0.06, 0.12);
-    lArmMesh.rotation.z = Math.PI / 2.6;
-    addToonOutline(THREE, lArmMesh, 1.12);
-    this.leftArmPivot.add(lArmMesh);
-    const lHand = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), this._toonMat(0x74D1B8));
-    lHand.position.set(0.54, -0.14, 0.22);
-    addToonOutline(THREE, lHand, 1.12);
-    this.leftArmPivot.add(lHand);
+    this.leftArmPivot.position.set(0.56, 0.44, 0.06);
+    const armSleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.62, 10), this._toonMat(0x1D2939));
+    armSleeve.position.set(0.24, 0.20, 0.06);
+    armSleeve.rotation.z = -Math.PI / 3.8;
+    addToonOutline(THREE, armSleeve, 1.12);
+    this.leftArmPivot.add(armSleeve);
+
+    const mintHand = new THREE.Mesh(new THREE.SphereGeometry(0.145, 12, 10), this._toonMat(0x72D6B4));
+    mintHand.position.set(0.49, 0.43, 0.08);
+    addToonOutline(THREE, mintHand, 1.12);
+    this.leftArmPivot.add(mintHand);
     this.butlerUpper.add(this.leftArmPivot);
 
-    // Articulated Right Arm (Holds 3 Mini Card Wars Cards & Swings on Card Deal!)
-    this.rightArmPivot = new THREE.Group();
-    this.rightArmPivot.position.set(-0.62, 0.56, 0.08);
-    const rArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.64, 8), this._toonMat(0x1E293B));
-    rArmMesh.position.set(-0.18, -0.04, 0.20);
-    rArmMesh.rotation.x = Math.PI / 3;
-    addToonOutline(THREE, rArmMesh, 1.12);
-    this.rightArmPivot.add(rArmMesh);
-
-    const miniHandGroup = new THREE.Group();
-    miniHandGroup.position.set(-0.22, 0.04, 0.46);
-    [-0.24, 0, 0.24].forEach((rot, i) => {
-      const miniCard = new THREE.Mesh(
-        new THREE.BoxGeometry(0.24, 0.34, 0.02),
-        this._toonMat(i === 1 ? 0xFDE047 : 0xF97316)
-      );
-      miniCard.position.set(rot * 0.45, Math.abs(rot) * -0.06, i * 0.025);
-      miniCard.rotation.z = -rot;
+    // 7. Fanned Hand of 3 Bright Orange & Yellow Mini-Cards (Viewer's Left, exact match to reference!)
+    const cardsFan = new THREE.Group();
+    cardsFan.position.set(-0.84, 0.36, 0.16);
+    [
+      { x: -0.16, y: 0.0, z: -0.02, rz: 0.36, col: 0xEA580C },
+      { x: -0.02, y: 0.04, z: 0.01, rz: 0.10, col: 0xFACC15 },
+      { x: 0.12, y: 0.0, z: 0.04, rz: -0.16, col: 0xEA580C }
+    ].forEach((cfg) => {
+      const miniCard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.40, 0.024), this._toonMat(cfg.col));
+      miniCard.position.set(cfg.x, cfg.y, cfg.z);
+      miniCard.rotation.z = cfg.rz;
       addToonOutline(THREE, miniCard, 1.09);
-      miniHandGroup.add(miniCard);
+      cardsFan.add(miniCard);
     });
-    this.rightArmPivot.add(miniHandGroup);
-    this.butlerUpper.add(this.rightArmPivot);
+    this.butlerUpper.add(cardsFan);
+    this.animatedProps.cardsFan = cardsFan;
 
     this.scene.add(this.butlerRoot);
   }
 
-  _buildActiveCardAndParticles() {
+  _buildNineTableCards() {
     const THREE = this.THREE;
-    this.cardFrontCanvas = document.createElement('canvas');
-    this.cardFrontCanvas.width = 256;
-    this.cardFrontCanvas.height = 352;
-    this.cardFrontCtx = this.cardFrontCanvas.getContext('2d');
+    this.cardEntries = [];
+    this.pickables = [];
 
-    this.cardBackCanvas = document.createElement('canvas');
-    this.cardBackCanvas.width = 256;
-    this.cardBackCanvas.height = 352;
-    this.cardBackCtx = this.cardBackCanvas.getContext('2d');
+    const metas = this.cardsMeta.length === 9
+      ? this.cardsMeta
+      : Array.from({ length: 9 }, (_, i) => ({
+          roman: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'][i],
+          shortTitle: `Kartu ${i + 1}`,
+          title: `Kartu ${i + 1}`,
+          suit: 'concept',
+          suitLabel: 'SOKA'
+        }));
 
-    this.cardFrontTex = new THREE.CanvasTexture(this.cardFrontCanvas);
-    this.cardFrontTex.colorSpace = THREE.SRGBColorSpace;
-    this.cardBackTex = new THREE.CanvasTexture(this.cardBackCanvas);
-    this.cardBackTex.colorSpace = THREE.SRGBColorSpace;
+    metas.forEach((meta, idx) => {
+      const slot = TABLE_CARD_SLOTS[idx];
 
-    // Build active 3D playing card as Group of core slab + 2 non-mirrored front/back planes
-    // Verified by 3D rotation matrix: front plane faces +Y, back plane uses Rx(+pi/2)*Rz(pi)
-    // so flipping card around Z by Math.PI lands back face right-side-up with zero left-right mirror.
-    this.activeCardMesh = new THREE.Group();
-    const cardCore = new THREE.Mesh(new THREE.BoxGeometry(0.98, 0.032, 1.34), this._toonMat(0x1A1816));
-    this.activeCardMesh.add(cardCore);
+      // Real contact shadow on the playmat directly beneath each physical 3D card
+      const shadow = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.24, 1.68),
+        new THREE.MeshBasicMaterial({ color: 0x1A1816, transparent: true, opacity: 0.32 })
+      );
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.rotation.z = slot.rotY;
+      shadow.position.set(slot.x + 0.06, 0.046, slot.z + 0.07);
+      this.scene.add(shadow);
 
-    const frontPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.96, 1.32),
-      new THREE.MeshBasicMaterial({ map: this.cardFrontTex })
-    );
-    frontPlane.rotation.x = -Math.PI / 2;
-    frontPlane.position.y = 0.018;
-    this.activeCardMesh.add(frontPlane);
+      const group = new THREE.Group();
+      group.position.set(slot.x, 0.09, slot.z);
+      group.rotation.y = slot.rotY;
 
-    const backPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.96, 1.32),
-      new THREE.MeshBasicMaterial({ map: this.cardBackTex })
-    );
-    backPlane.rotation.set(Math.PI / 2, 0, Math.PI);
-    backPlane.position.y = -0.018;
-    this.activeCardMesh.add(backPlane);
+      // Thick 3D Card Body Slab
+      const core = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.044, 1.60), this._toonMat(0x1A1816));
+      core.userData.cardIdx = idx;
+      group.add(core);
+      this.pickables.push(core);
 
-    this.activeCardMesh.position.set(0.05, 0.30, -0.25);
-    this.scene.add(this.activeCardMesh);
+      // Front Plane (+Y): 512x704 Card Wars Illustrated Card Front (Zero mirroring)
+      const frontTex = createCardFaceTexture(THREE, meta, idx, false);
+      const frontPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.12, 1.56),
+        new THREE.MeshBasicMaterial({ map: frontTex })
+      );
+      frontPlane.rotation.x = -Math.PI / 2;
+      frontPlane.position.y = 0.024;
+      frontPlane.userData.cardIdx = idx;
+      group.add(frontPlane);
+      this.pickables.push(frontPlane);
 
-    // 8 Cartoon Burst Particles when card slams onto board
-    this.particles = [];
-    const pGeo = new THREE.OctahedronGeometry(0.075, 0);
-    for (let i = 0; i < 8; i++) {
-      const pMesh = new THREE.Mesh(pGeo, new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xFDE047 : 0xFFFFFF }));
-      pMesh.visible = false;
-      this.scene.add(pMesh);
-      this.particles.push({ mesh: pMesh, vx: 0, vy: 0, vz: 0, life: 0 });
-    }
+      // Back Plane (-Y): Rx(+pi/2)*Rz(pi) so flipping around Z=PI lands right-side-up (Zero mirroring)
+      const backTex = createCardFaceTexture(THREE, meta, idx, true);
+      const backPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.12, 1.56),
+        new THREE.MeshBasicMaterial({ map: backTex })
+      );
+      backPlane.rotation.set(Math.PI / 2, 0, Math.PI);
+      backPlane.position.y = -0.024;
+      backPlane.userData.cardIdx = idx;
+      group.add(backPlane);
+      this.pickables.push(backPlane);
 
-    this._redrawActiveCard();
-  }
+      // Bright golden rim highlight when hovered or active
+      const glowRing = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.28, 1.72),
+        new THREE.MeshBasicMaterial({ color: 0xFDE047, transparent: true, opacity: 0.0, side: THREE.DoubleSide })
+      );
+      glowRing.rotation.x = -Math.PI / 2;
+      glowRing.position.y = -0.028;
+      group.add(glowRing);
 
-  _redrawActiveCard() {
-    if (!this.cardFrontCtx || !this.cardBackCtx) return;
-    drawPlayingCardTexture(this.cardFrontCtx, { ...this.cardState, isBack: false });
-    drawPlayingCardTexture(this.cardBackCtx, { ...this.cardState, isBack: true });
-    this.cardFrontTex.needsUpdate = true;
-    this.cardBackTex.needsUpdate = true;
-  }
+      const faceUp = this.showAllFaceUp || this.openedSet.has(idx);
+      group.rotation.z = faceUp ? 0 : Math.PI;
 
-  _spawnCardBurst() {
-    if (this.prefersReducedMotion || !this.particles) return;
-    this.particles.forEach((p, idx) => {
-      const ang = (idx / this.particles.length) * Math.PI * 2;
-      p.mesh.position.set(0.05, 0.34, -0.25);
-      p.vx = Math.cos(ang) * 0.065;
-      p.vy = 0.065 + (idx % 3) * 0.015;
-      p.vz = Math.sin(ang) * 0.065;
-      p.life = 1.0;
-      p.mesh.visible = true;
+      this.scene.add(group);
+      this.cardEntries.push({ idx, slot, group, shadow, glowRing });
     });
   }
+
+  _onMouseMove = (e) => {
+    this.mouseNdc.x = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
+    this.mouseNdc.y = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
+
+    if (!this.interactiveTable || this.mode !== 'webgl' || !this.raycaster || !this.camera) {
+      if (this.hoveredIdx !== -1) {
+        this.hoveredIdx = -1;
+        if (this.renderer?.domElement) this.renderer.domElement.style.cursor = 'default';
+        this.onCardHover && this.onCardHover(null);
+      }
+      return;
+    }
+
+    this.pointerVec.set(this.mouseNdc.x, -this.mouseNdc.y);
+    this.raycaster.setFromCamera(this.pointerVec, this.camera);
+    const hits = this.raycaster.intersectObjects(this.pickables, false);
+    const hitIdx = hits.length > 0 ? hits[0].object.userData.cardIdx : -1;
+
+    if (hitIdx !== this.hoveredIdx) {
+      this.hoveredIdx = hitIdx;
+      if (this.renderer?.domElement) {
+        this.renderer.domElement.style.cursor = hitIdx >= 0 ? 'pointer' : 'default';
+      }
+      this.onCardHover && this.onCardHover(hitIdx >= 0 ? hitIdx : null);
+    }
+  };
+
+  _onCanvasClick = () => {
+    if (!this.interactiveTable || this.hoveredIdx < 0) return;
+    this.onCardPick && this.onCardPick(this.hoveredIdx);
+  };
 
   _activate2DFallback() {
     this._stopLoop();
     if (this.renderer) {
+      this.renderer.domElement.removeEventListener('click', this._onCanvasClick);
       this.renderer.dispose();
       this.renderer = null;
     }
@@ -833,10 +1420,42 @@ export class CardWarsWorld {
     }
     if (this.fallbackContainer) {
       this.fallbackContainer.classList.remove('hidden');
-      render2DFallbackWorld(this.fallbackContainer, { mood: this.mood, ...this.cardState });
+      this._sync2DFallback();
     }
     this.mode = '2d';
     this.onModeChange && this.onModeChange('2d');
+  }
+
+  _sync2DFallback() {
+    if (!this.fallbackContainer) return;
+    render2DFallbackWorld(this.fallbackContainer, {
+      mood: this.mood,
+      cards: this.cardsMeta,
+      openedSet: this.openedSet,
+      activeIdx: this.activeIdx,
+      showAllFaceUp: this.showAllFaceUp,
+      onCardPick: this.onCardPick
+    });
+  }
+
+  setShowAllFaceUp(flag) {
+    this.showAllFaceUp = !!flag;
+    if (this.mode === '2d') this._sync2DFallback();
+  }
+
+  syncDeckState({ openedSet, activeIdx }) {
+    if (openedSet) this.openedSet = new Set(openedSet);
+    if (typeof activeIdx === 'number') this.activeIdx = activeIdx;
+    if (this.mode === '2d') this._sync2DFallback();
+  }
+
+  setTableInteractive(flag) {
+    this.interactiveTable = !!flag;
+    if (!flag && this.hoveredIdx !== -1) {
+      this.hoveredIdx = -1;
+      if (this.renderer?.domElement) this.renderer.domElement.style.cursor = 'default';
+      this.onCardHover && this.onCardHover(null);
+    }
   }
 
   setButlerMood(mood) {
@@ -845,64 +1464,36 @@ export class CardWarsWorld {
     if (this.mode === 'webgl' && this.faceCtx) {
       drawButlerFaceCanvas(this.faceCtx, safeMood, this.isBlinking);
       this.faceTex.needsUpdate = true;
-    } else if (this.mode === '2d' && this.fallbackContainer) {
-      render2DFallbackWorld(this.fallbackContainer, { mood: safeMood, ...this.cardState });
+    } else if (this.mode === '2d') {
+      this._sync2DFallback();
     }
   }
 
   setCameraMode(mode) {
     this.cameraMode = mode;
-    if (mode === 'intro' || mode === 'overview') {
-      this.camTargetPos = { x: 0.15, y: 2.55, z: 5.55 };
-      this.camTargetLook = { x: -0.45, y: 0.90, z: -0.60 };
-    } else if (mode === 'peek') {
-      this.camTargetPos = { x: 0.0, y: 2.50, z: 5.35 };
-      this.camTargetLook = { x: -0.25, y: 0.80, z: -0.50 };
+    if (mode === 'table' || mode === 'intro' || mode === 'overview' || mode === 'peek') {
+      this.camTargetPos = { x: 0.0, y: 3.72, z: 5.82 };
+      this.camTargetLook = { x: 0.0, y: 0.52, z: -0.45 };
     } else {
-      // 'focus': frames Sir Pip cleanly in upper-left 0%-25% (y=14%-48%) directly above his Comic Speech Bubble
-      this.camTargetPos = { x: 1.95, y: 2.95, z: 6.15 };
-      this.camTargetLook = { x: 1.25, y: 0.12, z: -0.45 };
+      this.camTargetPos = { x: 1.05, y: 4.15, z: 6.15 };
+      this.camTargetLook = { x: 0.45, y: 0.45, z: -0.35 };
     }
   }
 
-  setCardFaceState({ suit, roman, faceDown }) {
-    this.cardState = {
-      suit: suit || this.cardState.suit,
-      roman: roman || this.cardState.roman,
-      faceDown: !!faceDown
-    };
-    if (this.mode === 'webgl') this._redrawActiveCard();
-    else if (this.mode === '2d' && this.fallbackContainer) {
-      render2DFallbackWorld(this.fallbackContainer, { mood: this.mood, ...this.cardState });
-    }
-  }
-
-  triggerCardDeal({ suit, roman, faceDown }) {
-    this.setCardFaceState({ suit, roman, faceDown });
-    if (this.mode === 'webgl') {
-      this.dealAnim = { active: !this.prefersReducedMotion, t: this.prefersReducedMotion ? 1 : 0 };
-      if (!this.prefersReducedMotion) this.shakeAmp = 0.09;
-      this._spawnCardBurst();
-    }
+  triggerCardDeal({ activeIdx, openedSet } = {}) {
+    if (openedSet) this.openedSet = new Set(openedSet);
+    if (typeof activeIdx === 'number') this.activeIdx = activeIdx;
+    if (!this.prefersReducedMotion) this.shakeAmp = 0.05;
+    if (this.mode === '2d') this._sync2DFallback();
   }
 
   async set2DMode(use2D) {
-    if (use2D) {
-      this._activate2DFallback();
-    } else {
-      await this.init(false);
-    }
+    if (use2D) this._activate2DFallback();
+    else await this.init(false);
   }
 
-  pause() {
-    this.paused = true;
-    this._stopLoop();
-  }
-
-  resume() {
-    this.paused = false;
-    if (this.mode === 'webgl') this._startLoop();
-  }
+  pause() { this.paused = true; this._stopLoop(); }
+  resume() { this.paused = false; if (this.mode === 'webgl') this._startLoop(); }
 
   resize() {
     if (!this.renderer || !this.camera) return;
@@ -925,14 +1516,10 @@ export class CardWarsWorld {
   }
 
   _stopLoop() {
-    if (this.rafId) {
-      cancelAnimationFrame(this.rafId);
-      this.rafId = null;
-    }
+    if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
   }
 
   _stepFrame(elapsed) {
-    // 1. Periodic natural eye blink
     const blinkCycle = elapsed % 3.4;
     const wantBlink = !this.prefersReducedMotion && blinkCycle > 3.24;
     if (wantBlink !== this.isBlinking && this.faceCtx) {
@@ -941,92 +1528,78 @@ export class CardWarsWorld {
       this.faceTex.needsUpdate = true;
     }
 
-    // 2. Butler idle breathing + mood pose choreography
     if (this.butlerUpper) {
-      const bob = this.prefersReducedMotion ? 0 : Math.sin(elapsed * 2.4) * 0.045;
-      const ahaJump = this.mood === 'aha' && !this.prefersReducedMotion ? Math.abs(Math.sin(elapsed * 5.2)) * 0.14 : 0;
-      this.butlerUpper.position.y = bob + ahaJump;
-
-      const targetRotZ = this.mood === 'think' ? 0.18 : this.mood === 'point' ? -0.08 : 0;
-      this.butlerUpper.rotation.z += (targetRotZ - this.butlerUpper.rotation.z) * 0.10;
-
-      const mouseLookY = this.prefersReducedMotion ? 0 : this.mouseNdc.x * 0.12;
-      const baseYaw = this.mood === 'point' ? 0.56 : 0.42;
-      this.butlerRoot.rotation.y += (baseYaw + mouseLookY - this.butlerRoot.rotation.y) * 0.08;
-
-      if (this.butlerCap) {
-        this.butlerCap.position.y = 1.44 + (this.mood === 'aha' ? ahaJump * 0.45 : 0);
-      }
-
+      const bob = this.prefersReducedMotion ? 0 : Math.sin(elapsed * 2.5) * 0.045;
+      this.butlerUpper.position.y = bob;
       if (this.leftArmPivot) {
-        const wave = !this.prefersReducedMotion && (this.mood === 'greet' || this.mood === 'aha')
-          ? Math.sin(elapsed * 6.5) * 0.25 : 0;
-        const targetLArmZ =
-          this.mood === 'point' ? 0.26
-            : this.mood === 'aha' || this.mood === 'greet' ? 0.85 + wave
-              : this.mood === 'proud' ? 0.48
-                : this.mood === 'think' ? 0.58 : -0.18;
-        this.leftArmPivot.rotation.z += (targetLArmZ - this.leftArmPivot.rotation.z) * 0.12;
+        const wave = !this.prefersReducedMotion ? Math.sin(elapsed * (this.mood === 'greet' ? 5.6 : 2.6)) * (this.mood === 'greet' ? 0.24 : 0.08) : 0;
+        const baseZ = this.mood === 'greet' || this.mood === 'aha' ? 0.18 : -0.12;
+        this.leftArmPivot.rotation.z += ((baseZ + wave) - this.leftArmPivot.rotation.z) * 0.14;
       }
-
-      if (this.rightArmPivot) {
-        const dealSwing = this.dealAnim.active ? Math.sin(this.dealAnim.t * Math.PI) * 1.15 : 0;
-        const targetRArmX = (this.mood === 'deal' ? -0.35 : 0) - dealSwing;
-        this.rightArmPivot.rotation.x += (targetRArmX - this.rightArmPivot.rotation.x) * 0.16;
+      if (this.animatedProps.cardsFan && !this.prefersReducedMotion) {
+        this.animatedProps.cardsFan.position.y = 0.36 + Math.sin(elapsed * 3.1) * 0.04;
+        this.animatedProps.cardsFan.rotation.z = Math.sin(elapsed * 2.2) * 0.07;
       }
     }
 
-    // 3. Flying / Slamming Active 3D Card Mesh
-    if (this.activeCardMesh) {
-      const targetFlipZ = this.cardState.faceDown ? Math.PI : 0;
-      if (this.dealAnim.active) {
-        this.dealAnim.t = Math.min(1, this.dealAnim.t + 0.055);
-        const u = 1 - Math.pow(1 - this.dealAnim.t, 3);
-        this.activeCardMesh.position.x = -1.9 + (0.05 - -1.9) * u;
-        this.activeCardMesh.position.z = -1.3 + (-0.25 - -1.3) * u;
-        this.activeCardMesh.position.y = 0.30 + Math.sin(this.dealAnim.t * Math.PI) * 1.15;
-        this.activeCardMesh.rotation.z = targetFlipZ + (1 - u) * Math.PI * 2;
-        if (this.dealAnim.t >= 1) this.dealAnim.active = false;
-      } else {
-        const hoverY = this.cardState.faceDown && !this.prefersReducedMotion
-          ? 0.48 + Math.sin(elapsed * 2.6) * 0.08 : 0.28;
-        this.activeCardMesh.position.y += (hoverY - this.activeCardMesh.position.y) * 0.12;
-        this.activeCardMesh.rotation.z += (targetFlipZ - this.activeCardMesh.rotation.z) * 0.14;
-        this.activeCardMesh.rotation.y = this.cardState.faceDown && !this.prefersReducedMotion
-          ? Math.sin(elapsed * 1.2) * 0.18 : 0.04;
+    // Lively background motion: drifting clouds, bobbing sailboat, swaying palms, rotating crystal, coffee steam & sparkles!
+    if (!this.prefersReducedMotion && this.animatedProps) {
+      for (const c of this.animatedProps.clouds) {
+        c.group.position.x = ((c.baseX + elapsed * c.speed + 14) % 28) - 14;
+      }
+      if (this.animatedProps.boat) {
+        this.animatedProps.boat.position.y = -0.42 + Math.sin(elapsed * 2.1) * 0.05;
+        this.animatedProps.boat.rotation.z = Math.sin(elapsed * 1.7) * 0.08;
+        this.animatedProps.boat.position.x = -4.8 + Math.sin(elapsed * 0.22) * 1.4;
+      }
+      for (const p of this.animatedProps.palms) {
+        p.group.rotation.z = Math.sin(elapsed * 1.3 + p.phase) * 0.035;
+      }
+      if (this.animatedProps.crystal) {
+        this.animatedProps.crystal.rotation.y = elapsed * 0.9;
+        this.animatedProps.crystal.position.y = 0.66 + Math.sin(elapsed * 2.6) * 0.06;
+      }
+      for (const s of this.animatedProps.steam) {
+        const cyc = (elapsed * 0.45 + s.offset) % 1;
+        s.mesh.position.y = 0.56 + cyc * 0.72;
+        s.mesh.position.x = 5.55 + Math.sin(elapsed * 2.4 + s.offset * 6) * 0.07;
+        s.mesh.material.opacity = (1 - cyc) * 0.6;
+      }
+      for (const sp of this.animatedProps.sparkle) {
+        sp.mesh.position.y = sp.baseY + Math.sin(elapsed * 2.2 + sp.phase) * 0.14;
+        sp.mesh.rotation.y = elapsed * 1.6 + sp.phase;
       }
     }
 
-    // 4. Card Slam Burst Particles
-    if (this.particles) {
-      this.particles.forEach((p) => {
-        if (p.life <= 0) return;
-        p.life -= 0.04;
-        p.vy -= 0.004;
-        p.mesh.position.x += p.vx;
-        p.mesh.position.y += p.vy;
-        p.mesh.position.z += p.vz;
-        p.mesh.rotation.x += 0.18;
-        p.mesh.scale.setScalar(Math.max(0.01, p.life));
-        if (p.life <= 0) p.mesh.visible = false;
-      });
+    for (const entry of this.cardEntries) {
+      const isHovered = this.interactiveTable && entry.idx === this.hoveredIdx;
+      const faceUp = this.showAllFaceUp || this.openedSet.has(entry.idx);
+      const isActive = entry.idx === this.activeIdx;
+
+      const targetFlipZ = faceUp ? 0 : Math.PI;
+      const targetY = isHovered ? 0.54 : isActive ? 0.16 : 0.09;
+      const targetRotX = isHovered ? 0.34 : 0.0;
+      const targetScale = isHovered ? 1.12 : 1.0;
+
+      entry.group.position.y += (targetY - entry.group.position.y) * 0.18;
+      entry.group.rotation.z += (targetFlipZ - entry.group.rotation.z) * 0.14;
+      entry.group.rotation.x += (targetRotX - entry.group.rotation.x) * 0.18;
+      const s = entry.group.scale.x + (targetScale - entry.group.scale.x) * 0.18;
+      entry.group.scale.setScalar(s);
+
+      const wantGlow = isHovered ? 0.92 : isActive ? 0.52 : 0.0;
+      entry.glowRing.material.opacity += (wantGlow - entry.glowRing.material.opacity) * 0.18;
+      entry.shadow.material.opacity = isHovered ? 0.18 : 0.32;
     }
 
-    // 5. Smooth Camera Lerp + Subtle Peek Orbit + Damped Deal Micro-Shake
-    const peekOffsetX = this.cameraMode === 'peek' && !this.prefersReducedMotion ? Math.sin(elapsed * 0.55) * 1.15 : 0;
-    const parallaxX = this.prefersReducedMotion ? 0 : this.mouseNdc.x * 0.16;
-    const parallaxY = this.prefersReducedMotion ? 0 : -this.mouseNdc.y * 0.08;
-
+    const parallaxX = this.prefersReducedMotion ? 0 : this.mouseNdc.x * 0.24;
+    const parallaxZ = this.prefersReducedMotion ? 0 : this.mouseNdc.y * 0.16;
     this.shakeAmp *= 0.86;
     const shakeY = this.shakeAmp > 0.002 ? Math.sin(elapsed * 55) * this.shakeAmp : 0;
 
-    const tx = this.camTargetPos.x + peekOffsetX + parallaxX;
-    const ty = this.camTargetPos.y + parallaxY + shakeY;
-    const tz = this.camTargetPos.z;
-
-    this.camera.position.x += (tx - this.camera.position.x) * 0.08;
-    this.camera.position.y += (ty - this.camera.position.y) * 0.08;
-    this.camera.position.z += (tz - this.camera.position.z) * 0.08;
+    this.camera.position.x += (this.camTargetPos.x + parallaxX - this.camera.position.x) * 0.08;
+    this.camera.position.y += (this.camTargetPos.y + shakeY - this.camera.position.y) * 0.08;
+    this.camera.position.z += (this.camTargetPos.z + parallaxZ - this.camera.position.z) * 0.08;
 
     this.camCurrentLook.x += (this.camTargetLook.x - this.camCurrentLook.x) * 0.08;
     this.camCurrentLook.y += (this.camTargetLook.y - this.camCurrentLook.y) * 0.08;
@@ -1038,6 +1611,7 @@ export class CardWarsWorld {
     this._stopLoop();
     window.removeEventListener('mousemove', this._onMouseMove);
     if (this.renderer) {
+      this.renderer.domElement.removeEventListener('click', this._onCanvasClick);
       this.renderer.dispose();
       this.renderer = null;
     }

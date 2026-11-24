@@ -1,8 +1,8 @@
-// Three.js 3D Search Landscape & Agent Lab (Card Wars Deck Card VII v5)
+// Three.js 3D Search Landscape & Agent Lab (Card Wars Deck Card VII v8)
 // Includes automatic & toggleable 2D Canvas Topographic Contour Heatmap fallback (R-27)
 // Automatically pauses RAF when card is inactive or document.hidden === true
 
-import { BENCHMARK_FUNCTIONS } from '../algorithms/benchmarks.js?v=6';
+import { BENCHMARK_FUNCTIONS } from '../algorithms/benchmarks.js?v=10';
 
 let threeModuleCache = null;
 

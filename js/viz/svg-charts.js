@@ -1,7 +1,9 @@
-// Crisp Cartoon-Editorial Scientific SVG Charts (Card Wars 3D + Shorts Deck v5)
+// Crisp Accessible SVG Charts (v10: MCT-PSO + MCT-GOA Comparison & Paper Benchmarks)
+// L4: All text >= 12px | L5: Repulsion Orange dashed (#C2410C) vs Attraction Blue solid (#1D4ED8)
+// L6: Distinct patterns & short labels readable in grayscale
 
-import { socialForce, comfortZoneRadius, computeStandardC, computeHybridC } from '../algorithms/hybrid-goa-alo.js?v=6';
-import { PAPER_EMPIRICAL_DATA } from '../algorithms/benchmarks.js?v=6';
+import { socialForce, comfortZoneRadius, computeStandardC, computeHybridC, computeW } from '../algorithms/hybrid-goa-alo.js?v=10';
+import { PAPER_EMPIRICAL_DATA } from '../algorithms/benchmarks.js?v=10';
 
 function formatSci(val) {
   if (!Number.isFinite(val)) return 'N/A';
@@ -11,11 +13,12 @@ function formatSci(val) {
   return val.toFixed(abs < 1 ? 4 : 2);
 }
 
+// L5: Separate Orange Dashed Repulsion (#C2410C) vs Blue Solid Attraction (#1D4ED8)
 export function renderSocialCurveChart(container, { f = 0.5, l = 1.5 } = {}) {
   if (!container) return;
-  const W = 440;
-  const H = 186;
-  const pad = { t: 18, r: 18, b: 30, l: 42 };
+  const W = 480;
+  const H = 205;
+  const pad = { t: 22, r: 20, b: 34, l: 50 };
   const pw = W - pad.l - pad.r;
   const ph = H - pad.t - pad.b;
 
@@ -26,10 +29,14 @@ export function renderSocialCurveChart(container, { f = 0.5, l = 1.5 } = {}) {
   const xOf = (r) => pad.l + ((r - rMin) / (rMax - rMin)) * pw;
   const yOf = (y) => pad.t + ((yMax - Math.max(yMin, Math.min(yMax, y))) / (yMax - yMin)) * ph;
 
-  const pts = [];
+  const repelPts = [];
+  const attractPts = [];
   for (let i = 0; i <= 90; i++) {
     const r = rMin + (i / 90) * (rMax - rMin);
-    pts.push(`${xOf(r).toFixed(1)},${yOf(socialForce(r, f, l)).toFixed(1)}`);
+    const val = socialForce(r, f, l);
+    const pt = `${xOf(r).toFixed(1)},${yOf(val).toFixed(1)}`;
+    if (val < 0) repelPts.push(pt);
+    else attractPts.push(pt);
   }
 
   const yZero = yOf(0);
@@ -37,29 +44,31 @@ export function renderSocialCurveChart(container, { f = 0.5, l = 1.5 } = {}) {
   const r0Visible = r0 && r0 >= rMin && r0 <= rMax;
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Kurva fungsi gaya sosial s(r)">
-      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="4" fill="#FFFFFF" stroke="rgba(18,24,22,0.14)"/>
-      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${(yZero - pad.t).toFixed(1)}" fill="#1D4ED8" fill-opacity="0.06"/>
-      <rect x="${pad.l}" y="${yZero.toFixed(1)}" width="${pw}" height="${(pad.t + ph - yZero).toFixed(1)}" fill="#DC2626" fill-opacity="0.06"/>
+    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Kurva gaya sosial s(r): zona tolak oranye putus-putus dan zona tarik biru solid">
+      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="6" fill="#FFFFFF" stroke="#1A1816" stroke-width="1.6"/>
+      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${(yZero - pad.t).toFixed(1)}" fill="#1D4ED8" fill-opacity="0.08"/>
+      <rect x="${pad.l}" y="${yZero.toFixed(1)}" width="${pw}" height="${(pad.t + ph - yZero).toFixed(1)}" fill="#C2410C" fill-opacity="0.09"/>
 
-      <line x1="${pad.l}" y1="${yZero.toFixed(1)}" x2="${pad.l + pw}" y2="${yZero.toFixed(1)}" stroke="#121816" stroke-width="1" stroke-dasharray="3 3"/>
-      <polyline points="${pts.join(' ')}" fill="none" stroke="#1D4ED8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="${pad.l}" y1="${yZero.toFixed(1)}" x2="${pad.l + pw}" y2="${yZero.toFixed(1)}" stroke="#1A1816" stroke-width="1.3" stroke-dasharray="4 3"/>
+
+      ${repelPts.length ? `<polyline points="${repelPts.join(' ')}" fill="none" stroke="#C2410C" stroke-width="3.2" stroke-dasharray="6 3" stroke-linecap="round"/>` : ''}
+      ${attractPts.length ? `<polyline points="${attractPts.join(' ')}" fill="none" stroke="#1D4ED8" stroke-width="3.2" stroke-linecap="round"/>` : ''}
 
       ${r0Visible ? `
-        <line x1="${xOf(r0).toFixed(1)}" y1="${pad.t}" x2="${xOf(r0).toFixed(1)}" y2="${pad.t + ph}" stroke="#B91C1C" stroke-width="1.3" stroke-dasharray="3 2"/>
-        <circle cx="${xOf(r0).toFixed(1)}" cy="${yZero.toFixed(1)}" r="4.8" fill="#FFFFFF" stroke="#B91C1C" stroke-width="2"/>
-        <text x="${Math.min(pad.l + pw - 92, xOf(r0) + 6).toFixed(1)}" y="${(pad.t + 14).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="10" font-weight="700" fill="#B91C1C">r0 = ${r0.toFixed(3)}</text>
+        <line x1="${xOf(r0).toFixed(1)}" y1="${pad.t}" x2="${xOf(r0).toFixed(1)}" y2="${pad.t + ph}" stroke="#1A1816" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <circle cx="${xOf(r0).toFixed(1)}" cy="${yZero.toFixed(1)}" r="5.5" fill="#FDE047" stroke="#1A1816" stroke-width="2"/>
+        <text x="${Math.min(pad.l + pw - 118, xOf(r0) + 8).toFixed(1)}" y="${(pad.t + 16).toFixed(1)}" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#1A1816">r0 = ${r0.toFixed(2)}</text>
       ` : ''}
 
-      <g font-family="JetBrains Mono, monospace" font-size="9.5" fill="#424B47">
-        <text x="${pad.l - 6}" y="${pad.t + 6}" text-anchor="end">+0.45</text>
-        <text x="${pad.l - 6}" y="${yZero + 3}" text-anchor="end">0.0</text>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="#4B4742">
+        <text x="${pad.l - 6}" y="${pad.t + 8}" text-anchor="end">+0.45</text>
+        <text x="${pad.l - 6}" y="${yZero + 4}" text-anchor="end">0.0</text>
         <text x="${pad.l - 6}" y="${pad.t + ph}" text-anchor="end">-0.80</text>
-        <text x="${pad.l}" y="${H - 8}">0</text>
-        <text x="${xOf(2.0).toFixed(1)}" y="${H - 8}" text-anchor="middle">Jarak r = 2.0</text>
-        <text x="${pad.l + pw}" y="${H - 8}" text-anchor="end">r = 4.5</text>
-        <text x="${pad.l + pw - 4}" y="${pad.t + 13}" text-anchor="end" fill="#1D4ED8">Menarik s(r) &gt; 0</text>
-        <text x="${pad.l + pw - 4}" y="${pad.t + ph - 6}" text-anchor="end" fill="#B91C1C">Mendorong s(r) &lt; 0</text>
+        <text x="${pad.l}" y="${H - 9}">0</text>
+        <text x="${xOf(2.0).toFixed(1)}" y="${H - 9}" text-anchor="middle">Jarak r = 2.0</text>
+        <text x="${pad.l + pw}" y="${H - 9}" text-anchor="end">r = 4.5</text>
+        <text x="${pad.l + pw - 6}" y="${pad.t + 16}" text-anchor="end" font-weight="700" fill="#1D4ED8">TARIK s(r) &gt; 0 (solid)</text>
+        <text x="${pad.l + pw - 6}" y="${pad.t + ph - 8}" text-anchor="end" font-weight="700" fill="#C2410C">TOLAK s(r) &lt; 0 (putus)</text>
       </g>
     </svg>
   `;
@@ -67,9 +76,9 @@ export function renderSocialCurveChart(container, { f = 0.5, l = 1.5 } = {}) {
 
 export function renderCDecayChart(container, { L = 200, cMax = 1.0, cMin = 0.00001 } = {}) {
   if (!container) return;
-  const W = 460;
-  const H = 212;
-  const pad = { t: 22, r: 20, b: 34, l: 46 };
+  const W = 490;
+  const H = 224;
+  const pad = { t: 28, r: 20, b: 36, l: 52 };
   const pw = W - pad.l - pad.r;
   const ph = H - pad.t - pad.b;
 
@@ -87,47 +96,82 @@ export function renderCDecayChart(container, { L = 200, cMax = 1.0, cMin = 0.000
   const xHalf = xOf(L / 2);
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Perbandingan peluruhan parameter c GOA standar dan Hybrid GOA-ALO">
-      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="4" fill="#FFFFFF" stroke="rgba(18,24,22,0.14)"/>
-      <rect x="${pad.l}" y="${pad.t}" width="${(xHalf - pad.l).toFixed(1)}" height="${ph}" fill="#1D4ED8" fill-opacity="0.06"/>
-      <rect x="${xHalf.toFixed(1)}" y="${pad.t}" width="${(pad.l + pw - xHalf).toFixed(1)}" height="${ph}" fill="#DC2626" fill-opacity="0.06"/>
+    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Perbandingan peluruhan parameter c GOA standar dan Hybrid GOA-ALO di pivot L/2">
+      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="6" fill="#FFFFFF" stroke="#1A1816" stroke-width="1.6"/>
+      <rect x="${pad.l}" y="${pad.t}" width="${(xHalf - pad.l).toFixed(1)}" height="${ph}" fill="#1D4ED8" fill-opacity="0.07"/>
+      <rect x="${xHalf.toFixed(1)}" y="${pad.t}" width="${(pad.l + pw - xHalf).toFixed(1)}" height="${ph}" fill="#B91C1C" fill-opacity="0.07"/>
 
-      <line x1="${xHalf.toFixed(1)}" y1="${pad.t}" x2="${xHalf.toFixed(1)}" y2="${pad.t + ph}" stroke="#B91C1C" stroke-width="1.4" stroke-dasharray="4 3"/>
+      <line x1="${xHalf.toFixed(1)}" y1="${pad.t}" x2="${xHalf.toFixed(1)}" y2="${pad.t + ph}" stroke="#B91C1C" stroke-width="1.8" stroke-dasharray="5 3"/>
 
-      <polyline points="${stdPts.join(' ')}" fill="none" stroke="#424B47" stroke-width="1.9" stroke-dasharray="5 4"/>
-      <polyline points="${hybPts.join(' ')}" fill="none" stroke="#B91C1C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${xHalf.toFixed(1)}" cy="${yOf(cMin).toFixed(1)}" r="4.8" fill="#FFFFFF" stroke="#B91C1C" stroke-width="2"/>
+      <polyline points="${stdPts.join(' ')}" fill="none" stroke="#4B4742" stroke-width="2.2" stroke-dasharray="6 4"/>
+      <polyline points="${hybPts.join(' ')}" fill="none" stroke="#B91C1C" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${xHalf.toFixed(1)}" cy="${yOf(cMin).toFixed(1)}" r="5.5" fill="#FDE047" stroke="#B91C1C" stroke-width="2.2"/>
 
-      <g font-family="JetBrains Mono, monospace" font-size="9.5" fill="#424B47">
-        <text x="${pad.l + 6}" y="${pad.t + 14}" fill="#1D4ED8" font-weight="600">PARUH 1: CARI LUAS (Eq. 9)</text>
-        <text x="${xHalf + 6}" y="${pad.t + 14}" fill="#B91C1C" font-weight="600">PARUH 2: KUNCI PRESISI (Eq. 10)</text>
-        <text x="${pad.l - 6}" y="${pad.t + 5}" text-anchor="end">${cMax.toFixed(2)}</text>
-        <text x="${pad.l - 6}" y="${pad.t + ph / 2 + 3}" text-anchor="end">${(cMax / 2).toFixed(2)}</text>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="#4B4742">
+        <text x="${pad.l + 6}" y="${pad.t + 16}" fill="#1D4ED8" font-weight="700">PARUH 1: CARI LUAS</text>
+        <text x="${xHalf + 6}" y="${pad.t + 16}" fill="#B91C1C" font-weight="700">PARUH 2: PRESISI</text>
+        <text x="${pad.l - 6}" y="${pad.t + 6}" text-anchor="end">${cMax.toFixed(1)}</text>
+        <text x="${pad.l - 6}" y="${pad.t + ph / 2 + 4}" text-anchor="end">${(cMax / 2).toFixed(1)}</text>
         <text x="${pad.l - 6}" y="${pad.t + ph}" text-anchor="end">0</text>
-        <text x="${pad.l}" y="${H - 12}">l = 0</text>
-        <text x="${xHalf.toFixed(1)}" y="${H - 12}" text-anchor="middle" fill="#B91C1C" font-weight="700">Pivot L/2 = ${Math.round(L / 2)}</text>
-        <text x="${pad.l + pw}" y="${H - 12}" text-anchor="end">L = ${L}</text>
+        <text x="${pad.l}" y="${H - 11}">l = 0</text>
+        <text x="${xHalf.toFixed(1)}" y="${H - 11}" text-anchor="middle" fill="#B91C1C" font-weight="700">Pivot L/2 = ${Math.round(L / 2)}</text>
+        <text x="${pad.l + pw}" y="${H - 11}" text-anchor="end">L = ${L}</text>
       </g>
 
-      <g font-family="JetBrains Mono, monospace" font-size="9.5">
-        <line x1="${pad.l}" y1="10" x2="${pad.l + 18}" y2="10" stroke="#B91C1C" stroke-width="2.5"/>
-        <text x="${pad.l + 23}" y="13" fill="#121816">Hybrid c (Eq. 9-10)</text>
-        <line x1="${pad.l + 165}" y1="10" x2="${pad.l + 183}" y2="10" stroke="#424B47" stroke-width="1.8" stroke-dasharray="5 3"/>
-        <text x="${pad.l + 188}" y="13" fill="#424B47">GOA Standar (Eq. 8)</text>
+      <g font-family="JetBrains Mono, monospace" font-size="12">
+        <line x1="${pad.l}" y1="12" x2="${pad.l + 20}" y2="12" stroke="#B91C1C" stroke-width="3"/>
+        <text x="${pad.l + 25}" y="16" fill="#1A1816" font-weight="700">Hybrid c (Eq.9-10)</text>
+        <line x1="${pad.l + 215}" y1="12" x2="${pad.l + 235}" y2="12" stroke="#4B4742" stroke-width="2.2" stroke-dasharray="5 3"/>
+        <text x="${pad.l + 240}" y="16" fill="#4B4742">GOA Asli (Eq.8)</text>
       </g>
     </svg>
   `;
 }
 
-export function renderMctConvergenceChart(container, { mctHistory = [], pureHistory = [], showPure = true } = {}) {
-  if (!container || mctHistory.length === 0) return;
-  const W = 630;
-  const H = 148;
-  const pad = { t: 22, r: 16, b: 26, l: 50 };
+// PRD M8: Visual staircase chart showing w stepping 1 -> 6 along t/T
+export function renderWStaircaseChart(container) {
+  if (!container) return;
+  const W = 490;
+  const H = 136;
+  const pad = { t: 22, r: 18, b: 30, l: 42 };
   const pw = W - pad.l - pad.r;
   const ph = H - pad.t - pad.b;
 
-  const allVals = showPure ? [...mctHistory, ...pureHistory] : [...mctHistory];
+  const xOf = (frac) => pad.l + frac * pw;
+  const yOf = (w) => pad.t + ((6.4 - w) / 5.8) * ph;
+
+  const pts = [];
+  for (let pct = 0; pct <= 100; pct++) {
+    const w = computeW(pct, 100);
+    pts.push(`${xOf(pct / 100).toFixed(1)},${yOf(w).toFixed(1)}`);
+  }
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Grafik tangga parameter penyempitan w pada ALO dan Hybrid GOA-ALO">
+      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="5" fill="#FFFFFF" stroke="#1A1816" stroke-width="1.5"/>
+      <polyline points="${pts.join(' ')}" fill="none" stroke="#B91C1C" stroke-width="3" stroke-linejoin="miter"/>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="#4B4742">
+        <text x="${pad.l}" y="14" font-weight="700" fill="#1A1816">TANGGA w PADA I = 10^w (t/T) [Paper: Eq.11-12]</text>
+        <text x="${pad.l - 6}" y="${yOf(6) + 4}" text-anchor="end">w=6</text>
+        <text x="${pad.l - 6}" y="${yOf(1) + 4}" text-anchor="end">w=1</text>
+        <text x="${xOf(0.1).toFixed(1)}" y="${H - 8}" text-anchor="middle">10%</text>
+        <text x="${xOf(0.5).toFixed(1)}" y="${H - 8}" text-anchor="middle">50%</text>
+        <text x="${xOf(0.75).toFixed(1)}" y="${H - 8}" text-anchor="middle">75%</text>
+        <text x="${xOf(0.95).toFixed(1)}" y="${H - 8}" text-anchor="middle" fill="#B91C1C" font-weight="700">95%</text>
+      </g>
+    </svg>
+  `;
+}
+
+export function renderMctConvergenceChart(container, { mctHistory = [], psoHistory = [], pureHistory = [], showPure = true } = {}) {
+  if (!container || mctHistory.length === 0) return;
+  const W = 630;
+  const H = 172;
+  const pad = { t: 28, r: 16, b: 30, l: 56 };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+
+  const allVals = [...mctHistory, ...psoHistory, ...(showPure ? pureHistory : [])];
   const yMax = Math.max(...allVals) * 1.04;
   const yMin = Math.min(...allVals) * 0.96;
   const ySpan = Math.max(1e-6, yMax - yMin);
@@ -140,29 +184,35 @@ export function renderMctConvergenceChart(container, { mctHistory = [], pureHist
   }).join(' ');
 
   const mctFinal = mctHistory[mctHistory.length - 1];
-  const pureFinal = pureHistory[pureHistory.length - 1];
+  const psoFinal = psoHistory.length ? psoHistory[psoHistory.length - 1] : null;
+  const pureFinal = pureHistory.length ? pureHistory[pureHistory.length - 1] : null;
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Kurva penurunan Makespan MCT-seeded GOA dibanding Pure GOA">
-      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="4" fill="#FFFFFF" stroke="rgba(18,24,22,0.14)"/>
-      <line x1="${pad.l}" y1="${pad.t + ph / 2}" x2="${pad.l + pw}" y2="${pad.t + ph / 2}" stroke="rgba(18,24,22,0.08)" stroke-dasharray="3 3"/>
+    <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Kurva simulasi penurunan Makespan MCT-PSO, MCT-GOA, dan start acak">
+      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="5" fill="#FFFFFF" stroke="#1A1816" stroke-width="1.5"/>
+      <line x1="${pad.l}" y1="${pad.t + ph / 2}" x2="${pad.l + pw}" y2="${pad.t + ph / 2}" stroke="rgba(26,24,22,0.12)" stroke-dasharray="4 3"/>
 
-      ${showPure && pureHistory.length ? `<polyline points="${toPoly(pureHistory)}" fill="none" stroke="#64748B" stroke-width="1.9" stroke-dasharray="5 3"/>` : ''}
-      <polyline points="${toPoly(mctHistory)}" fill="none" stroke="#0F6B56" stroke-width="2.6" stroke-linejoin="round"/>
-      <rect x="${(pad.l - 4).toFixed(1)}" y="${(pad.t + ((yMax - mctHistory[0]) / ySpan) * ph - 4).toFixed(1)}" width="8" height="8" rx="2" fill="#0F6B56" stroke="#121816" stroke-width="1.1"/>
+      ${showPure && pureHistory.length ? `<polyline points="${toPoly(pureHistory)}" fill="none" stroke="#64748B" stroke-width="2.2" stroke-dasharray="6 4"/>` : ''}
+      ${psoHistory.length ? `<polyline points="${toPoly(psoHistory)}" fill="none" stroke="#6D28D9" stroke-width="2.8" stroke-dasharray="9 3" stroke-linejoin="round"/>` : ''}
+      <polyline points="${toPoly(mctHistory)}" fill="none" stroke="#0F766E" stroke-width="3.0" stroke-linejoin="round"/>
+      <rect x="${(pad.l - 5).toFixed(1)}" y="${(pad.t + ((yMax - mctHistory[0]) / ySpan) * ph - 5).toFixed(1)}" width="10" height="10" rx="2" fill="#0F766E" stroke="#1A1816" stroke-width="1.4"/>
 
-      <g font-family="JetBrains Mono, monospace" font-size="9.5" fill="#424B47">
-        <text x="${pad.l - 6}" y="${pad.t + 6}" text-anchor="end">${yMax.toFixed(1)}s</text>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="#4B4742">
+        <text x="${pad.l - 6}" y="${pad.t + 8}" text-anchor="end">${yMax.toFixed(1)}s</text>
         <text x="${pad.l - 6}" y="${pad.t + ph}" text-anchor="end">${yMin.toFixed(1)}s</text>
         <text x="${pad.l}" y="${H - 8}">Iter 0 (Start)</text>
-        <text x="${pad.l + pw}" y="${H - 8}" text-anchor="end">Iter ${maxL}</text>
+        <text x="${pad.l + pw}" y="${H - 8}" text-anchor="end">Iter ${maxL} [Simulasi Web]</text>
       </g>
-      <g font-family="JetBrains Mono, monospace" font-size="10">
-        <line x1="${pad.l}" y1="11" x2="${pad.l + 18}" y2="11" stroke="#0F6B56" stroke-width="2.6"/>
-        <text x="${pad.l + 23}" y="14" fill="#121816" font-weight="600">MCT+GOA: ${mctFinal.toFixed(2)}s</text>
-        ${showPure && pureHistory.length ? `
-          <line x1="${pad.l + 184}" y1="11" x2="${pad.l + 202}" y2="11" stroke="#64748B" stroke-width="1.9" stroke-dasharray="4 3"/>
-          <text x="${pad.l + 207}" y="14" fill="#424B47">Pure GOA (Acak): ${pureFinal.toFixed(2)}s</text>
+      <g font-family="JetBrains Mono, monospace" font-size="12">
+        ${psoFinal !== null ? `
+          <line x1="${pad.l}" y1="14" x2="${pad.l + 18}" y2="14" stroke="#6D28D9" stroke-width="2.8" stroke-dasharray="6 2"/>
+          <text x="${pad.l + 22}" y="18" fill="#6D28D9" font-weight="700">MCT+PSO: ${psoFinal.toFixed(2)}s</text>
+        ` : ''}
+        <line x1="${pad.l + 195}" y1="14" x2="${pad.l + 213}" y2="14" stroke="#0F766E" stroke-width="3"/>
+        <text x="${pad.l + 217}" y="18" fill="#0F766E" font-weight="700">MCT+GOA: ${mctFinal.toFixed(2)}s</text>
+        ${showPure && pureFinal !== null ? `
+          <line x1="${pad.l + 392}" y1="14" x2="${pad.l + 410}" y2="14" stroke="#64748B" stroke-width="2.2" stroke-dasharray="5 3"/>
+          <text x="${pad.l + 414}" y="18" fill="#4B4742">Acak: ${pureFinal.toFixed(2)}s</text>
         ` : ''}
       </g>
     </svg>
@@ -172,8 +222,8 @@ export function renderMctConvergenceChart(container, { mctHistory = [], pureHist
 export function renderLabConvergenceChart(container, { series = [], maxIter = 150 } = {}) {
   if (!container) return;
   const W = 580;
-  const H = 128;
-  const pad = { t: 20, r: 16, b: 22, l: 58 };
+  const H = 144;
+  const pad = { t: 24, r: 16, b: 26, l: 64 };
   const pw = W - pad.l - pad.r;
   const ph = H - pad.t - pad.b;
 
@@ -196,7 +246,7 @@ export function renderLabConvergenceChart(container, { series = [], maxIter = 15
 
   const linesSvg = series.map((s) => {
     const pts = s.values.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
-    return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} stroke-linejoin="round"/>`;
+    return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2.4}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} stroke-linejoin="round"/>`;
   }).join('');
 
   let legendX = pad.l;
@@ -204,24 +254,24 @@ export function renderLabConvergenceChart(container, { series = [], maxIter = 15
     const last = s.values[s.values.length - 1];
     const label = `${s.label}: ${formatSci(last)}`;
     const out = `
-      <line x1="${legendX}" y1="10" x2="${legendX + 14}" y2="10" stroke="${s.color}" stroke-width="2.2" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>
-      <text x="${legendX + 18}" y="13" font-family="JetBrains Mono, monospace" font-size="9.5" fill="#121816">${label}</text>
+      <line x1="${legendX}" y1="12" x2="${legendX + 14}" y2="12" stroke="${s.color}" stroke-width="2.6" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''}/>
+      <text x="${legendX + 19}" y="16" font-family="JetBrains Mono, monospace" font-size="12" fill="#1A1816">${label}</text>
     `;
-    legendX += Math.max(130, label.length * 6.3 + 28);
+    legendX += Math.max(162, label.length * 7.6 + 26);
     return out;
   }).join('');
 
   container.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="Kurva konvergensi fitness real-time laboratorium simulasi">
-      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="4" fill="#FFFFFF" stroke="rgba(18,24,22,0.14)"/>
-      <line x1="${xHalf.toFixed(1)}" y1="${pad.t}" x2="${xHalf.toFixed(1)}" y2="${pad.t + ph}" stroke="#B91C1C" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
+      <rect x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" rx="5" fill="#FFFFFF" stroke="#1A1816" stroke-width="1.5"/>
+      <line x1="${xHalf.toFixed(1)}" y1="${pad.t}" x2="${xHalf.toFixed(1)}" y2="${pad.t + ph}" stroke="#B91C1C" stroke-width="1.3" stroke-dasharray="4 3" opacity="0.8"/>
       ${linesSvg}
       ${legendSvg}
-      <g font-family="JetBrains Mono, monospace" font-size="9" fill="#424B47">
-        <text x="${pad.l - 5}" y="${pad.t + 6}" text-anchor="end">${formatSci(rawMax)}</text>
-        <text x="${pad.l - 5}" y="${pad.t + ph}" text-anchor="end">${formatSci(rawMin)}</text>
+      <g font-family="JetBrains Mono, monospace" font-size="12" fill="#4B4742">
+        <text x="${pad.l - 6}" y="${pad.t + 8}" text-anchor="end">${formatSci(rawMax)}</text>
+        <text x="${pad.l - 6}" y="${pad.t + ph}" text-anchor="end">${formatSci(rawMin)}</text>
         <text x="${pad.l}" y="${H - 6}">0${useLog ? ' (log10)' : ''}</text>
-        <text x="${xHalf.toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="#B91C1C">L/2</text>
+        <text x="${xHalf.toFixed(1)}" y="${H - 6}" text-anchor="middle" fill="#B91C1C" font-weight="700">L/2</text>
         <text x="${pad.l + pw}" y="${H - 6}" text-anchor="end">L=${maxIter}</text>
       </g>
     </svg>
@@ -232,39 +282,42 @@ export function renderBenchmarkChart(container, { groupKey = 'unimodal', onFocus
   const group = PAPER_EMPIRICAL_DATA[groupKey] || PAPER_EMPIRICAL_DATA.unimodal;
   if (!container) return;
   const rows = group.rows;
-  const W = 560;
-  const rowH = 33;
-  const pad = { t: 26, r: 78, b: 18, l: 140 };
+  const W = 580;
+  const rowH = 36;
+  const pad = { t: 28, r: 92, b: 18, l: 152 };
   const H = pad.t + rows.length * rowH + pad.b;
   const pw = W - pad.l - pad.r;
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.value)));
 
   const colorMap = {
     hybrid: '#B91C1C',
+    mct: '#0F766E',
+    pso: '#6D28D9',
     goa: '#1D4ED8',
-    alo: '#0F6B56',
-    other: '#94A3B8'
+    alo: '#0F766E',
+    other: '#64748B'
   };
+  const suffix = group.unit || (groupKey === 'antenna' ? ' dB' : '');
 
   const barsSvg = rows.map((row, idx) => {
     const y = pad.t + idx * rowH;
-    const bw = Math.max(8, (Math.abs(row.value) / maxAbs) * pw);
-    const fill = colorMap[row.highlight] || '#94A3B8';
-    const isTop = row.highlight === 'hybrid';
+    const bw = Math.max(10, (Math.abs(row.value) / maxAbs) * pw);
+    const fill = colorMap[row.highlight] || '#64748B';
+    const isTop = row.highlight === 'hybrid' || row.highlight === 'mct';
     return `
-      <g class="bench-bar-row" data-row-idx="${idx}" tabindex="0" role="button" aria-label="${row.algo}: ${row.value}. ${row.note}" style="cursor:pointer;">
-        <rect x="4" y="${y + 1}" width="${W - 8}" height="${rowH - 4}" rx="4" fill="transparent"/>
-        <text x="${pad.l - 10}" y="${y + 20}" text-anchor="end" font-family="Plus Jakarta Sans, sans-serif" font-size="12" font-weight="${isTop ? '700' : '500'}" fill="${isTop ? '#121816' : '#424B47'}">${row.algo}</text>
-        <rect x="${pad.l}" y="${y + 6}" width="${bw.toFixed(1)}" height="18" rx="4" fill="${fill}" stroke="#121816" stroke-width="${isTop ? '1.3' : '0.5'}"/>
-        <text x="${(pad.l + bw + 8).toFixed(1)}" y="${y + 20}" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="${isTop ? '700' : '500'}" fill="${isTop ? '#B91C1C' : '#121816'}">${row.value}${groupKey === 'antenna' ? ' dB' : ''}</text>
+      <g class="bench-bar-row" data-row-idx="${idx}" tabindex="0" role="button" aria-label="${row.algo}: ${row.value}${suffix}. ${row.note}" style="cursor:pointer;">
+        <rect x="4" y="${y + 1}" width="${W - 8}" height="${rowH - 4}" rx="5" fill="transparent"/>
+        <text x="${pad.l - 10}" y="${y + 22}" text-anchor="end" font-family="Plus Jakarta Sans, Segoe UI, sans-serif" font-size="13" font-weight="${isTop ? '700' : '600'}" fill="${isTop ? '#1A1816' : '#4B4742'}">${row.algo}</text>
+        <rect x="${pad.l}" y="${y + 7}" width="${bw.toFixed(1)}" height="20" rx="4" fill="${fill}" stroke="#1A1816" stroke-width="${isTop ? '2' : '1'}"/>
+        <text x="${(pad.l + bw + 8).toFixed(1)}" y="${y + 22}" font-family="JetBrains Mono, monospace" font-size="12.5" font-weight="${isTop ? '700' : '600'}" fill="${isTop ? fill : '#1A1816'}">${row.value}${suffix}</text>
       </g>
     `;
   }).join('');
 
   container.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" class="w-full h-auto block" role="img" aria-label="${group.title}">
-      <text x="${pad.l}" y="15" font-family="JetBrains Mono, monospace" font-size="10" fill="#424B47">${group.metricLabel}</text>
-      <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H - pad.b}" stroke="#121816" stroke-width="1.2"/>
+      <text x="${pad.l}" y="17" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#4B4742">${group.metricLabel}</text>
+      <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${H - pad.b}" stroke="#1A1816" stroke-width="1.8"/>
       ${barsSvg}
     </svg>
   `;
