@@ -9,8 +9,8 @@ import {
   BENCHMARK_FUNCTIONS,
   PAPER_EMPIRICAL_DATA,
   MCT_WALKTHROUGH_EXAMPLE
-} from '../algorithms/benchmarks.js?v=10';
-import { generateWorkload, generateVmSpeeds, runPatternBSimulation } from '../algorithms/mct-goa.js?v=10';
+} from '../algorithms/benchmarks.js?v=11';
+import { generateWorkload, generateVmSpeeds, runPatternBSimulation } from '../algorithms/mct-goa.js?v=11';
 import {
   MetaheuristicRunner,
   comfortZoneRadius,
@@ -18,7 +18,7 @@ import {
   computeHybridC,
   computeW,
   computeI
-} from '../algorithms/hybrid-goa-alo.js?v=10';
+} from '../algorithms/hybrid-goa-alo.js?v=11';
 import {
   renderShapesLegend,
   renderButler2DSvg,
@@ -33,7 +33,7 @@ import {
   renderHybridTaxonomy,
   renderHybridFlowchart,
   FLOWCHART_NODES
-} from '../viz/svg-illustrator.js?v=10';
+} from '../viz/svg-illustrator.js?v=11';
 import {
   renderSocialCurveChart,
   renderCDecayChart,
@@ -41,16 +41,16 @@ import {
   renderMctConvergenceChart,
   renderLabConvergenceChart,
   renderBenchmarkChart
-} from '../viz/svg-charts.js?v=10';
-import { ThreeLabController } from '../viz/three-lab.js?v=10';
-import { CardWarsWorld } from '../viz/world-3d.js?v=10';
+} from '../viz/svg-charts.js?v=11';
+import { ThreeLabController } from '../viz/three-lab.js?v=11';
+import { CardWarsWorld } from '../viz/world-3d.js?v=11';
 import {
   ShortsStageController,
   INTRO_BEATS,
   GLOSSARY_TERMS,
   FINAL_QUIZ_QUESTIONS
-} from './shorts-stage.js?v=10';
-import { DeckController, SLIDE_META, positionSlidingIndicator } from './deck.js?v=10';
+} from './shorts-stage.js?v=11';
+import { DeckController, SLIDE_META, positionSlidingIndicator } from './deck.js?v=11';
 
 function bindRangePair(baseId, { min, max, onChange }) {
   const rangeEl = document.getElementById(`${baseId}-range`);

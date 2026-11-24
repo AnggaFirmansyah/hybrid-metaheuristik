@@ -4,7 +4,7 @@
 // Preserves all A1-A8 verified accuracy, [Paper]/[Simulasi]/[Usulan] badges, Speaker Notes (S),
 // 3 Duration Tracks (15m/30m/45m), 15 Glossary Terms, and 8-Question Final Quiz.
 
-import { BUTLER_MOODS, renderButler2DSvg } from '../viz/svg-illustrator.js?v=10';
+import { BUTLER_MOODS, renderButler2DSvg } from '../viz/svg-illustrator.js?v=11';
 
 export const MOOD_LABELS = {
   greet: '1. INTRO',

@@ -238,6 +238,8 @@ function solveWithPSO({
     pBestFit.push(fit);
   }
 
+  const initialFitness = [...pBestFit];
+
   let gIdx = 0;
   for (let i = 1; i < popSize; i++) {
     if (pBestFit[i] < pBestFit[gIdx]) gIdx = i;
@@ -283,6 +285,7 @@ function solveWithPSO({
     bestAssignment: bestEval.assignment,
     readyTimes: bestEval.readyTimes,
     history,
+    initialFitness,
     pSeed
   };
 }

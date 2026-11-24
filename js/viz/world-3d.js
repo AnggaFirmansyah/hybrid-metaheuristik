@@ -6,7 +6,7 @@
 // coastal palms, distant Candy/Ooo spires, rainbow, bunting flags, stacked card piles, HP tokens,
 // D6/D20/D8 dice, drawstring pouches, watchtower, crystal spire, GOA grasshopper & ALO hourglass!).
 
-import { BUTLER_MOODS, renderButler2DSvg } from './svg-illustrator.js?v=10';
+import { BUTLER_MOODS, renderButler2DSvg } from './svg-illustrator.js?v=11';
 
 let cachedThree = null;
 
@@ -1375,24 +1375,25 @@ export class CardWarsWorld {
     });
   }
 
+  _raycastCard(clientX, clientY) {
+    if (!this.interactiveTable || this.mode !== 'webgl' || !this.raycaster || !this.camera || !this.renderer?.domElement) {
+      return -1;
+    }
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return -1;
+    const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.pointerVec.set(nx, ny);
+    this.raycaster.setFromCamera(this.pointerVec, this.camera);
+    const hits = this.raycaster.intersectObjects(this.pickables, false);
+    return hits.length > 0 ? hits[0].object.userData.cardIdx : -1;
+  }
+
   _onMouseMove = (e) => {
     this.mouseNdc.x = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
     this.mouseNdc.y = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
 
-    if (!this.interactiveTable || this.mode !== 'webgl' || !this.raycaster || !this.camera) {
-      if (this.hoveredIdx !== -1) {
-        this.hoveredIdx = -1;
-        if (this.renderer?.domElement) this.renderer.domElement.style.cursor = 'default';
-        this.onCardHover && this.onCardHover(null);
-      }
-      return;
-    }
-
-    this.pointerVec.set(this.mouseNdc.x, -this.mouseNdc.y);
-    this.raycaster.setFromCamera(this.pointerVec, this.camera);
-    const hits = this.raycaster.intersectObjects(this.pickables, false);
-    const hitIdx = hits.length > 0 ? hits[0].object.userData.cardIdx : -1;
-
+    const hitIdx = this._raycastCard(e.clientX, e.clientY);
     if (hitIdx !== this.hoveredIdx) {
       this.hoveredIdx = hitIdx;
       if (this.renderer?.domElement) {
@@ -1402,9 +1403,12 @@ export class CardWarsWorld {
     }
   };
 
-  _onCanvasClick = () => {
-    if (!this.interactiveTable || this.hoveredIdx < 0) return;
-    this.onCardPick && this.onCardPick(this.hoveredIdx);
+  _onCanvasClick = (e) => {
+    if (!this.interactiveTable) return;
+    const hitIdx = this._raycastCard(e.clientX, e.clientY);
+    const picked = hitIdx >= 0 ? hitIdx : this.hoveredIdx;
+    if (picked < 0) return;
+    this.onCardPick && this.onCardPick(picked);
   };
 
   _activate2DFallback() {

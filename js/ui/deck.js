@@ -2,7 +2,7 @@
 // Strictly ordered progression: Intro -> Arti Algoritma -> Cara Kerja & Implementasi -> Visualisasi & Bukti!
 // Always opens on the full live 3D Tabletop with 9 large illustrated clickable 3D cards!
 
-import { renderCardBackEmblem } from '../viz/svg-illustrator.js?v=10';
+import { renderCardBackEmblem } from '../viz/svg-illustrator.js?v=11';
 
 export const SLIDE_META = [
   {

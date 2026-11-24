@@ -2,8 +2,8 @@
 // L4: All text >= 12px | L5: Repulsion Orange dashed (#C2410C) vs Attraction Blue solid (#1D4ED8)
 // L6: Distinct patterns & short labels readable in grayscale
 
-import { socialForce, comfortZoneRadius, computeStandardC, computeHybridC, computeW } from '../algorithms/hybrid-goa-alo.js?v=10';
-import { PAPER_EMPIRICAL_DATA } from '../algorithms/benchmarks.js?v=10';
+import { socialForce, comfortZoneRadius, computeStandardC, computeHybridC, computeW } from '../algorithms/hybrid-goa-alo.js?v=11';
+import { PAPER_EMPIRICAL_DATA } from '../algorithms/benchmarks.js?v=11';
 
 function formatSci(val) {
   if (!Number.isFinite(val)) return 'N/A';

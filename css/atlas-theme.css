@@ -469,8 +469,14 @@ body.is-intro .tabletop-arena,
 body.is-intro .butler-dialogue-box,
 body.is-intro .card-hand-dock {
   opacity: 0;
-  pointer-events: none;
+  visibility: hidden;
+  pointer-events: none !important;
   transform: translateY(24px);
+}
+body.is-intro .tabletop-arena *,
+body.is-intro .butler-dialogue-box *,
+body.is-intro .card-hand-dock * {
+  pointer-events: none !important;
 }
 
 .intro-speech-card {
@@ -518,8 +524,15 @@ body.is-peeking-table .card-hand-dock,
 body.is-peeking-table .butler-dialogue-box,
 body.is-peeking-table .intro-stage {
   opacity: 0;
-  pointer-events: none;
+  visibility: hidden;
+  pointer-events: none !important;
   transform: translateY(26px);
+}
+body.is-peeking-table .tabletop-arena *,
+body.is-peeking-table .card-hand-dock *,
+body.is-peeking-table .butler-dialogue-box *,
+body.is-peeking-table .intro-stage * {
+  pointer-events: none !important;
 }
 
 /* ============================================================================

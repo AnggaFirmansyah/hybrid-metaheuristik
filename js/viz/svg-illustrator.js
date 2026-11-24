@@ -2,8 +2,8 @@
 // L1: Reusable Permanent Shapes Legend | L4: All SVG labels >= 12 | L5: Orange dashed Repulsion (#C2410C) vs Blue solid Attraction (#1D4ED8)
 // L6: Non-color differentiators (filled square MCT, dotted circle GOA, hatched funnel ALO, purple hexagon Metaheuristic, gold diamond Decision/Elite)
 
-import { socialForce, comfortZoneRadius } from '../algorithms/hybrid-goa-alo.js?v=10';
-import { MCT_WALKTHROUGH_EXAMPLE } from '../algorithms/benchmarks.js?v=10';
+import { socialForce, comfortZoneRadius } from '../algorithms/hybrid-goa-alo.js?v=11';
+import { MCT_WALKTHROUGH_EXAMPLE } from '../algorithms/benchmarks.js?v=11';
 
 export const BUTLER_MOODS = ['greet', 'deal', 'point', 'think', 'aha', 'proud'];
 
@@ -733,8 +733,8 @@ export function renderMctSeedingPipeline(container, { tasks, vmSpeeds, mctResult
   const boxY = 48;
   const boxW = 148;
   const boxH = 166;
-  const initFits = mctGoa ? mctGoa.initialFitness : [];
-  const pSeed = mctGoa ? mctGoa.pSeed : 1;
+  const initFits = (mctGoa && Array.isArray(mctGoa.initialFitness)) ? mctGoa.initialFitness : [];
+  const pSeed = mctGoa ? (mctGoa.pSeed || 1) : 1;
   const injectedReady = shown >= M;
   let swarmDots = '';
 

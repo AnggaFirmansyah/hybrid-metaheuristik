@@ -2,7 +2,7 @@
 // Includes automatic & toggleable 2D Canvas Topographic Contour Heatmap fallback (R-27)
 // Automatically pauses RAF when card is inactive or document.hidden === true
 
-import { BENCHMARK_FUNCTIONS } from '../algorithms/benchmarks.js?v=10';
+import { BENCHMARK_FUNCTIONS } from '../algorithms/benchmarks.js?v=11';
 
 let threeModuleCache = null;
 
@@ -97,6 +97,7 @@ class Contour2DFallback {
     this.height = Math.max(220, Math.floor(rect.height));
     this.canvas.width = Math.floor(this.width * dpr);
     this.canvas.height = Math.floor(this.height * dpr);
+    if (!this.ctx) return;
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
